@@ -7,7 +7,9 @@ const nodemailer = require('nodemailer');
 let _transporter = null;
 
 function getTransporter() {
-  if (_transporter) return _transporter;
+  if (_transporter) {
+    return _transporter;
+  }
 
   const { SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, SMTP_FROM } = process.env;
 
