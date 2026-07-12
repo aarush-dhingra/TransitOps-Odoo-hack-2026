@@ -5,6 +5,7 @@ import { Toaster } from 'sonner';
 import { AuthProvider } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { SearchProvider } from './context/SearchContext';
+import { NotificationsProvider } from './context/NotificationsContext';
 import App from './App';
 import './index.css';
 
@@ -14,8 +15,10 @@ createRoot(document.getElementById('root')).render(
       <ThemeProvider>
         <AuthProvider>
           <SearchProvider>
-            <App />
-            <Toaster position="top-right" richColors />
+            <NotificationsProvider>
+              <App />
+              <Toaster position="top-right" richColors />
+            </NotificationsProvider>
           </SearchProvider>
         </AuthProvider>
       </ThemeProvider>
