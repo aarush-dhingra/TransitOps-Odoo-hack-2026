@@ -56,7 +56,7 @@ export default function LoginPage() {
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-600/5 border border-amber-500/30 flex items-center justify-center mb-6 shadow-[0_0_15px_rgba(245,158,11,0.2)]">
             <div className="w-6 h-6 bg-gradient-to-br from-amber-400 to-amber-600 rounded-md shadow-inner" />
           </div>
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-white to-slate-400 bg-clip-text text-transparent drop-shadow-sm tracking-tight mb-2">TransitOps</h1>
+          <h1 className="text-4xl font-bold text-white tracking-tight mb-2">TransitOps</h1>
           <p className="text-base text-slate-400 font-medium leading-relaxed">Smart Transport Operations Platform</p>
         </div>
 

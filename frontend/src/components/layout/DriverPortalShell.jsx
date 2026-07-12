@@ -12,7 +12,7 @@ export default function DriverPortalShell() {
     : '??';
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
+    <div className="min-h-screen bg-transparent">
       {/* Header */}
       <header className="glass border-b border-white/5 px-4 py-3 flex items-center justify-between sticky top-0 z-10">
         <div className="flex items-center gap-2.5">

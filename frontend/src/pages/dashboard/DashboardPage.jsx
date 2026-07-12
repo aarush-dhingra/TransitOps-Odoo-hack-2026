@@ -105,8 +105,8 @@ function count(arr, status) {
 function DonutCenter({ cx, cy, pct }) {
   return (
     <>
-      <text x={cx} y={cy - 8}  textAnchor="middle" fill="#f59e0b" fontSize={26} fontWeight={700}>{pct}%</text>
-      <text x={cx} y={cy + 14} textAnchor="middle" fill="#94a3b8" fontSize={11}>Utilization</text>
+      <text x={cx} y={cy - 8} textAnchor="middle" className="fill-amber-500 dark:fill-amber-500" fontSize={26} fontWeight={700}>{pct}%</text>
+      <text x={cx} y={cy + 14} textAnchor="middle" className="fill-slate-500 dark:fill-slate-400" fontSize={11}>Utilization</text>
     </>
   );
 }

@@ -114,7 +114,7 @@ export default function AddressAutocomplete({ label, value, onChange, onSelect, 
           onFocus={() => results.length > 0 && setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
           placeholder="Start typing an address or landmark"
-          className="w-full rounded-md border border-slate-700 bg-slate-800 py-2 pl-9 pr-9 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
+          className="input-base rounded-md py-2 pl-9 pr-9"
         />
         {loading && (
           <LoaderCircle className="absolute right-3 top-2.5 h-4 w-4 animate-spin text-amber-400" />
@@ -125,7 +125,7 @@ export default function AddressAutocomplete({ label, value, onChange, onSelect, 
         <div
           id={`${inputId}-suggestions`}
           role="listbox"
-          className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md border border-slate-700 bg-slate-900 shadow-xl"
+          className="absolute z-20 mt-1 max-h-64 w-full overflow-y-auto rounded-md glass-panel shadow-xl"
         >
           {error ? (
             <p className="px-3 py-3 text-xs text-red-400">{error}</p>
@@ -139,7 +139,7 @@ export default function AddressAutocomplete({ label, value, onChange, onSelect, 
                 role="option"
                 aria-selected={index === activeIndex}
                 onMouseDown={() => chooseLocation(location)}
-                className={`flex w-full items-start gap-2 border-b border-slate-800 px-3 py-2.5 text-left last:border-0 ${
+                className={`flex w-full items-start gap-2 border-b border-white/5 px-3 py-2.5 text-left last:border-0 ${
                   index === activeIndex ? 'bg-slate-800' : 'hover:bg-slate-800'
                 }`}
               >
@@ -155,7 +155,7 @@ export default function AddressAutocomplete({ label, value, onChange, onSelect, 
               </button>
             ))
           )}
-          <p className="border-t border-slate-800 px-3 py-1.5 text-right text-[10px] text-slate-600">
+          <p className="border-t border-white/5 px-3 py-1.5 text-right text-[10px] text-slate-600">
             Powered by Geoapify
           </p>
         </div>
