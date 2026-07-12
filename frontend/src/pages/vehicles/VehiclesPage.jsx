@@ -1,6 +1,13 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, X } from 'lucide-react';
-import { getVehicles, createVehicle, updateVehicle } from '../../api/vehicles';
+import { Eye, FileText, History, Plus, Trash2, Upload, X } from 'lucide-react';
+import {
+  createVehicle,
+  getVehicleDocumentVault,
+  getVehicleTimeline,
+  getVehicles,
+  updateVehicle,
+} from '../../api/vehicles';
+import { deleteDocument, downloadDocument, uploadDocument } from '../../api/documents';
 import StatusBadge from '../../components/shared/StatusBadge';
 import PageHeader from '../../components/shared/PageHeader';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
@@ -12,6 +19,12 @@ import { usePermissions } from '../../hooks/useAuth';
 const VEHICLE_TYPES  = ['VAN', 'TRUCK', 'BUS', 'CAR', 'BIKE'];
 const FUEL_TYPES     = ['DIESEL', 'PETROL', 'CNG', 'ELECTRIC'];
 const VEHICLE_STATUS = ['AVAILABLE', 'ON_TRIP', 'MAINTENANCE', 'RETIRED'];
+const DOCUMENT_CATEGORIES = [
+  { key: 'insurance', value: 'INSURANCE_CERTIFICATE', label: 'Insurance' },
+  { key: 'rc', value: 'VEHICLE_REGISTRY', label: 'Registration Certificate' },
+  { key: 'puc', value: 'PUC_CERTIFICATE', label: 'PUC Certificate' },
+  { key: 'fitness', value: 'FITNESS_CERTIFICATE', label: 'Fitness Certificate' },
+];
 
 const EMPTY_FORM = {
   registrationNumber: '',
@@ -38,6 +51,13 @@ export default function VehiclesPage() {
   const [editing,   setEditing]   = useState(null); // null = create, object = edit
   const [form,      setForm]      = useState(EMPTY_FORM);
   const [saving,    setSaving]    = useState(false);
+  const [detailsVehicle, setDetailsVehicle] = useState(null);
+  const [detailsTab, setDetailsTab] = useState('general');
+  const [timeline, setTimeline] = useState([]);
+  const [vault, setVault] = useState(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadForm, setUploadForm] = useState({ category: '', expiryDate: '', file: null });
   const todayStr = new Date().toISOString().split('T')[0];
   const currentYear = new Date().getFullYear();
 
@@ -109,6 +129,76 @@ export default function VehiclesPage() {
       toast.error(err.response?.data?.error?.message ?? 'Failed to save vehicle.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const refreshVehicleDetails = async (vehicleId) => {
+    setDetailsLoading(true);
+    try {
+      const [timelineResponse, vaultResponse] = await Promise.all([
+        getVehicleTimeline(vehicleId),
+        getVehicleDocumentVault(vehicleId),
+      ]);
+      setTimeline(timelineResponse.data.data ?? []);
+      setVault(vaultResponse.data.data);
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message ?? 'Failed to load vehicle details.');
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  const openDetails = (vehicle) => {
+    setDetailsVehicle(vehicle);
+    setDetailsTab('general');
+    setTimeline([]);
+    setVault(null);
+    setUploadForm({ category: '', expiryDate: '', file: null });
+    refreshVehicleDetails(vehicle.id);
+  };
+
+  const handleUpload = async (e) => {
+    e.preventDefault();
+    if (!uploadForm.category || !uploadForm.file) {
+      toast.error('Select a document category and file.');
+      return;
+    }
+    const formData = new FormData();
+    formData.append('vehicleId', detailsVehicle.id);
+    formData.append('category', uploadForm.category);
+    formData.append('file', uploadForm.file);
+    if (uploadForm.expiryDate) {
+      formData.append('expiryDate', new Date(uploadForm.expiryDate).toISOString());
+    }
+    setUploading(true);
+    try {
+      await uploadDocument(formData);
+      toast.success('Document uploaded.');
+      setUploadForm({ category: '', expiryDate: '', file: null });
+      await refreshVehicleDetails(detailsVehicle.id);
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message ?? 'Failed to upload document.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDeleteDocument = async (documentId) => {
+    if (!window.confirm('Delete this document?')) return;
+    try {
+      await deleteDocument(documentId);
+      toast.success('Document deleted.');
+      await refreshVehicleDetails(detailsVehicle.id);
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message ?? 'Failed to delete document.');
+    }
+  };
+
+  const handleViewDocument = async (document) => {
+    try {
+      await downloadDocument(document.id, document.originalName);
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message ?? 'Failed to open document.');
     }
   };
 
@@ -185,6 +275,7 @@ export default function VehiclesPage() {
                   <th className="px-5 py-3 text-right">Acq. Cost</th>
                   <th className="px-5 py-3 text-left">Ins. Expiry</th>
                   <th className="px-5 py-3 text-left">Status</th>
+                  <th className="px-5 py-3 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-800">
@@ -202,6 +293,17 @@ export default function VehiclesPage() {
                     <td className="px-5 py-3 text-right text-slate-500 text-xs">—</td>
                     <td className="px-5 py-3 text-slate-400 text-xs">{formatDate(v.insuranceExpiry)}</td>
                     <td className="px-5 py-3"><StatusBadge status={v.status} /></td>
+                    <td className="px-5 py-3 text-right">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openDetails(v);
+                        }}
+                        className="inline-flex items-center gap-1 text-xs text-amber-400 hover:text-amber-300"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> Details
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -278,6 +380,150 @@ export default function VehiclesPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {detailsVehicle && (
+        <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setDetailsVehicle(null)} />
+          <div className="relative w-full max-w-3xl bg-slate-900 border-l border-slate-800 overflow-y-auto">
+            <div className="sticky top-0 z-10 bg-slate-900 border-b border-slate-800 px-6 pt-6">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-white">{detailsVehicle.registrationNumber}</h2>
+                  <p className="text-sm text-slate-500 mt-1">
+                    {detailsVehicle.make} {detailsVehicle.model} · {detailsVehicle.type}
+                  </p>
+                </div>
+                <button onClick={() => setDetailsVehicle(null)} className="text-slate-400 hover:text-white" aria-label="Close">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="flex gap-5 mt-6 overflow-x-auto">
+                {[
+                  { key: 'general', label: 'General', icon: Eye },
+                  { key: 'vault', label: 'Document Vault', icon: FileText },
+                  { key: 'timeline', label: 'Timeline', icon: History },
+                ].map(({ key, label, icon: Icon }) => (
+                  <button
+                    key={key}
+                    onClick={() => setDetailsTab(key)}
+                    className={`flex items-center gap-1.5 pb-3 border-b-2 text-sm whitespace-nowrap ${
+                      detailsTab === key
+                        ? 'border-amber-500 text-amber-400'
+                        : 'border-transparent text-slate-500 hover:text-slate-300'
+                    }`}
+                  >
+                    <Icon className="w-4 h-4" /> {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="p-6">
+              {detailsLoading ? (
+                <LoadingSpinner />
+              ) : detailsTab === 'general' ? (
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {[
+                    ['Status', detailsVehicle.status.replace(/_/g, ' ')],
+                    ['Year', detailsVehicle.year],
+                    ['Fuel', detailsVehicle.fuelType],
+                    ['Odometer', `${detailsVehicle.currentOdometer?.toLocaleString('en-IN')} km`],
+                    ['Tank capacity', `${detailsVehicle.tankCapacity} L`],
+                    ['Maximum load', detailsVehicle.maximumLoadCapacity ? `${detailsVehicle.maximumLoadCapacity} kg` : '—'],
+                  ].map(([label, value]) => (
+                    <div key={label} className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+                      <p className="text-xs text-slate-500">{label}</p>
+                      <p className="text-sm font-medium text-slate-200 mt-1">{value}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : detailsTab === 'timeline' ? (
+                timeline.length === 0 ? (
+                  <EmptyState title="No activity yet" message="Trips, fuel, and maintenance events will appear here." />
+                ) : (
+                  <div className="border-l border-slate-700 ml-2 space-y-6">
+                    {timeline.map((event, index) => (
+                      <div key={`${event.type}-${event.date}-${index}`} className="relative pl-6">
+                        <span className="absolute -left-1.5 top-1.5 w-3 h-3 rounded-full bg-amber-500 border-2 border-slate-900" />
+                        <p className="text-xs text-slate-500">{formatDate(event.date)}</p>
+                        <h3 className="text-sm font-semibold text-slate-200 mt-1">{event.title}</h3>
+                        <p className="text-sm text-slate-400 mt-0.5">{event.description}</p>
+                      </div>
+                    ))}
+                  </div>
+                )
+              ) : (
+                <div className="space-y-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {DOCUMENT_CATEGORIES.map((category) => {
+                      const document = vault?.[category.key];
+                      return (
+                        <div key={category.key} className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <h3 className="text-sm font-semibold text-slate-200">{category.label}</h3>
+                              <p className="text-xs text-slate-500 truncate mt-1">
+                                {document?.uploaded ? document.originalName : 'No document uploaded'}
+                              </p>
+                            </div>
+                            <span className={`text-[10px] px-2 py-1 rounded ${
+                              document?.status === 'VALID' ? 'bg-emerald-500/10 text-emerald-400' :
+                              document?.status === 'EXPIRING_SOON' ? 'bg-amber-500/10 text-amber-400' :
+                              document?.status === 'EXPIRED' ? 'bg-red-500/10 text-red-400' :
+                              'bg-slate-700 text-slate-400'
+                            }`}>
+                              {document?.status ?? 'MISSING'}
+                            </span>
+                          </div>
+                          {document?.uploaded && (
+                            <div className="flex items-center justify-between gap-3 mt-4 pt-3 border-t border-slate-700">
+                              <button onClick={() => handleViewDocument(document)} className="text-xs text-amber-400 hover:text-amber-300">
+                                View file
+                              </button>
+                              {canEditFleet && (
+                                <button onClick={() => handleDeleteDocument(document.id)}
+                                  className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300">
+                                  <Trash2 className="w-3 h-3" /> Delete
+                                </button>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {canEditFleet && (
+                    <form onSubmit={handleUpload} className="bg-slate-800 border border-slate-700 rounded-lg p-4 space-y-3">
+                      <h3 className="text-sm font-semibold text-slate-200">Upload document</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                        <select required value={uploadForm.category}
+                          onChange={(e) => setUploadForm((current) => ({ ...current, category: e.target.value }))}
+                          className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-sm text-slate-200">
+                          <option value="">Category</option>
+                          {DOCUMENT_CATEGORIES.map((category) => (
+                            <option key={category.value} value={category.value}>{category.label}</option>
+                          ))}
+                        </select>
+                        <input type="date" value={uploadForm.expiryDate}
+                          onChange={(e) => setUploadForm((current) => ({ ...current, expiryDate: e.target.value }))}
+                          className="px-3 py-2 bg-slate-900 border border-slate-700 rounded-md text-sm text-slate-200" />
+                        <input type="file" required accept=".pdf,.jpg,.jpeg,.png"
+                          onChange={(e) => setUploadForm((current) => ({ ...current, file: e.target.files?.[0] ?? null }))}
+                          className="text-xs text-slate-400 file:mr-2 file:px-3 file:py-2 file:border-0 file:rounded file:bg-slate-700 file:text-slate-200" />
+                      </div>
+                      <button type="submit" disabled={uploading}
+                        className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold px-4 py-2 rounded-md text-sm disabled:opacity-50">
+                        <Upload className="w-4 h-4" /> {uploading ? 'Uploading…' : 'Upload'}
+                      </button>
+                    </form>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

@@ -14,3 +14,9 @@ export const updateVehicle = (id, data) =>
 
 export const updateVehicleStatus = (id, status) =>
   api.patch(`/vehicles/${id}/status`, { status });
+
+export const getVehicleTimeline = (id) =>
+  api.get(`/vehicles/${id}/timeline`);
+
+export const getVehicleDocumentVault = (id) =>
+  api.get(`/vehicles/${id}/document-vault`);

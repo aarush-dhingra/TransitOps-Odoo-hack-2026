@@ -224,6 +224,129 @@ async function patchVehicleStatus(req, res, next) {
   }
 }
 
+async function getVehicleTimeline(req, res, next) {
+  try {
+    const vehicle = await prisma.vehicle.findUnique({
+      where: { id: req.params.id },
+      include: {
+        trips: true,
+        fuelLogs: true,
+        maintenanceLogs: true,
+      },
+    });
+
+    if (!vehicle) {
+      return error(res, 'NOT_FOUND', 'Vehicle not found.', 404);
+    }
+
+    const events = [];
+
+    events.push({
+      date: vehicle.createdAt,
+      type: 'REGISTRATION',
+      title: 'Registered',
+      description: `Vehicle registered. Make: ${vehicle.make}, Model: ${vehicle.model}`,
+    });
+
+    for (const t of vehicle.trips) {
+      events.push({
+        date: t.plannedDeparture || t.createdAt,
+        type: 'TRIP',
+        title: `Trip #${t.tripNumber}`,
+        description: `Route: ${t.originAddress} to ${t.destinationAddress}. Status: ${t.status}`,
+      });
+    }
+
+    for (const f of vehicle.fuelLogs) {
+      events.push({
+        date: f.date,
+        type: 'FUEL',
+        title: 'Fuel Added',
+        description: `${f.litres}L of fuel filled for ${f.totalCost} INR at ${f.location || 'unknown location'}`,
+      });
+    }
+
+    for (const m of vehicle.maintenanceLogs) {
+      events.push({
+        date: m.date,
+        type: 'MAINTENANCE',
+        title: 'Maintenance',
+        description: `${m.type.replace('_', ' ').toLowerCase()}: ${m.description || 'no details'} (Cost: ${m.cost || 0} INR)`,
+      });
+    }
+
+    events.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    return success(res, events);
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function getVehicleDocumentVault(req, res, next) {
+  try {
+    const vehicleId = req.params.id;
+    const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
+    if (!vehicle) {
+      return error(res, 'NOT_FOUND', 'Vehicle not found.', 404);
+    }
+
+    const docs = await prisma.document.findMany({
+      where: { vehicleId },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const categories = {
+      insurance: 'INSURANCE_CERTIFICATE',
+      rc: 'VEHICLE_REGISTRY',
+      puc: 'PUC_CERTIFICATE',
+      fitness: 'FITNESS_CERTIFICATE',
+    };
+
+    const vault = {};
+
+    for (const [key, categoryName] of Object.entries(categories)) {
+      const doc = docs.find((d) => d.category === categoryName);
+      if (doc) {
+        let status = 'VALID';
+        let daysRemaining = null;
+
+        if (doc.expiryDate) {
+          const diffTime = new Date(doc.expiryDate) - new Date();
+          daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          if (daysRemaining <= 0) {
+            status = 'EXPIRED';
+          } else if (daysRemaining <= 30) {
+            status = 'EXPIRING_SOON';
+          }
+        }
+
+        vault[key] = {
+          uploaded: true,
+          id: doc.id,
+          originalName: doc.originalName,
+          mimeType: doc.mimeType,
+          sizeBytes: doc.sizeBytes,
+          createdAt: doc.createdAt,
+          expiryDate: doc.expiryDate,
+          status,
+          daysRemaining,
+        };
+      } else {
+        vault[key] = {
+          uploaded: false,
+          status: 'MISSING',
+          daysRemaining: null,
+        };
+      }
+    }
+
+    return success(res, vault);
+  } catch (err) {
+    return next(err);
+  }
+}
+
 module.exports = {
   listVehicles,
   getVehicle,
@@ -231,6 +354,8 @@ module.exports = {
   updateVehicle,
   deleteVehicle,
   patchVehicleStatus,
+  getVehicleTimeline,
+  getVehicleDocumentVault,
   createVehicleSchema,
   updateVehicleSchema,
   patchVehicleStatusSchema,
