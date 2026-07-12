@@ -50,11 +50,14 @@ function TripStepper({ status }) {
 
   const currentIdx = LIFECYCLE.indexOf(status);
 
+  // COMPLETED → all dots green; otherwise amber pulse on current step
+  const isCompleted = status === 'COMPLETED';
+
   return (
     <div className="flex items-center gap-0.5 mt-2">
       {LIFECYCLE.map((step, i) => {
-        const done    = i < currentIdx;
-        const current = i === currentIdx;
+        const done    = isCompleted ? true : i < currentIdx;
+        const current = !isCompleted && i === currentIdx;
         return (
           <div key={step} className="flex items-center">
             <div
@@ -72,7 +75,9 @@ function TripStepper({ status }) {
           </div>
         );
       })}
-      <span className="ml-1.5 text-[10px] text-slate-500">{LIFECYCLE_LABELS[status] ?? status}</span>
+      <span className={cn('ml-1.5 text-[10px]', isCompleted ? 'text-emerald-500' : 'text-slate-500')}>
+        {LIFECYCLE_LABELS[status] ?? status}
+      </span>
     </div>
   );
 }
