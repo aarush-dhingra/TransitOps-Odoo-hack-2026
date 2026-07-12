@@ -7,6 +7,7 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import EmptyState from '../../components/shared/EmptyState';
 import { formatDate } from '../../lib/utils';
 import { toast } from 'sonner';
+import { usePermissions } from '../../hooks/useAuth';
 
 const VEHICLE_TYPES  = ['VAN', 'TRUCK', 'BUS', 'CAR', 'BIKE'];
 const FUEL_TYPES     = ['DIESEL', 'PETROL', 'CNG', 'ELECTRIC'];
@@ -27,6 +28,8 @@ const EMPTY_FORM = {
 };
 
 export default function VehiclesPage() {
+  const { canWrite } = usePermissions();
+  const canEditFleet = canWrite('fleet');
   const [vehicles,  setVehicles]  = useState([]);
   const [loading,   setLoading]   = useState(true);
   const [error,     setError]     = useState('');
@@ -35,6 +38,8 @@ export default function VehiclesPage() {
   const [editing,   setEditing]   = useState(null); // null = create, object = edit
   const [form,      setForm]      = useState(EMPTY_FORM);
   const [saving,    setSaving]    = useState(false);
+  const todayStr = new Date().toISOString().split('T')[0];
+  const currentYear = new Date().getFullYear();
 
   const fetchVehicles = useCallback(async () => {
     setLoading(true);
@@ -61,6 +66,7 @@ export default function VehiclesPage() {
   };
 
   const openEdit = (v) => {
+    if (!canEditFleet) return;
     setEditing(v);
     setForm({
       registrationNumber: v.registrationNumber,
@@ -116,11 +122,11 @@ export default function VehiclesPage() {
       <PageHeader
         title="Vehicle Registry"
         subtitle="Manage fleet vehicles and their status"
-        action={
+        action={canEditFleet ? (
           <button onClick={openCreate} className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold px-4 py-2 rounded-md text-sm transition-colors">
             <Plus className="w-4 h-4" /> Add Vehicle
           </button>
-        }
+        ) : null}
       />
 
       {/* Filters */}
@@ -185,8 +191,8 @@ export default function VehiclesPage() {
                 {displayed.map((v) => (
                   <tr
                     key={v.id}
-                    onClick={() => openEdit(v)}
-                    className="hover:bg-slate-800/60 transition-colors cursor-pointer"
+                    onClick={() => canEditFleet && openEdit(v)}
+                    className={`hover:bg-slate-800/60 transition-colors ${canEditFleet ? 'cursor-pointer' : ''}`}
                   >
                     <td className="px-5 py-3 font-mono text-xs text-slate-200">{v.registrationNumber}</td>
                     <td className="px-5 py-3 text-slate-300">{v.make} {v.model} <span className="text-slate-500">({v.year})</span></td>
@@ -205,7 +211,7 @@ export default function VehiclesPage() {
       )}
 
       {/* Drawer */}
-      {drawerOpen && (
+      {drawerOpen && canEditFleet && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/50" onClick={() => setDrawerOpen(false)} />
           <div className="relative w-full max-w-md bg-slate-900 border-l border-slate-800 overflow-y-auto p-6 space-y-5">
@@ -218,22 +224,27 @@ export default function VehiclesPage() {
 
             <form onSubmit={handleSave} className="space-y-4">
               {[
-                { label: 'Registration Number', key: 'registrationNumber', required: true },
+                { label: 'Registration Number', key: 'registrationNumber', required: true, pattern: '^[A-Za-z0-9- ]{4,15}$', title: '4 to 15 alphanumeric characters', onChangeTransform: (v) => v.toUpperCase() },
                 { label: 'Make',                key: 'make',               required: true },
                 { label: 'Model',               key: 'model',              required: true },
-                { label: 'Year',                key: 'year',               type: 'number', required: true },
-                { label: 'Tank Capacity (L)',   key: 'tankCapacity',       type: 'number', required: true },
-                { label: 'Current Odometer',    key: 'currentOdometer',    type: 'number' },
-                { label: 'Insurance Expiry',    key: 'insuranceExpiry',    type: 'date' },
-                { label: 'PUC Expiry',          key: 'pucExpiry',          type: 'date' },
-              ].map(({ label, key, type = 'text', required }) => (
+                { label: 'Year',                key: 'year',               type: 'number', required: true, min: 1980, max: currentYear + 1 },
+                { label: 'Tank Capacity (L)',   key: 'tankCapacity',       type: 'number', required: true, min: 0, step: 'any' },
+                { label: 'Current Odometer',    key: 'currentOdometer',    type: 'number', min: 0 },
+                { label: 'Insurance Expiry',    key: 'insuranceExpiry',    type: 'date', min: todayStr },
+                { label: 'PUC Expiry',          key: 'pucExpiry',          type: 'date', min: todayStr },
+              ].map(({ label, key, type = 'text', required, pattern, title, min, max, step, onChangeTransform }) => (
                 <div key={key}>
                   <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">{label}</label>
                   <input
                     type={type}
                     required={required}
+                    pattern={pattern}
+                    title={title}
+                    min={min}
+                    max={max}
+                    step={step}
                     value={form[key]}
-                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                    onChange={(e) => setForm((f) => ({ ...f, [key]: onChangeTransform ? onChangeTransform(e.target.value) : e.target.value }))}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
                   />
                 </div>

@@ -15,18 +15,15 @@ const {
 } = require('../controllers/drivers.controller');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const validate = require('../middleware/validate');
+const { rolesFor } = require('../lib/permissions');
 
 const router = Router();
 
-const FM = 'FLEET_MANAGER';
-const SO = 'SAFETY_OFFICER';
-const DISP = 'DISPATCHER';
-
-router.get('/', verifyToken, requireRole(FM, SO, DISP), listDrivers);
-router.post('/', verifyToken, requireRole(SO, FM), validate(createDriverSchema), createDriver);
-router.get('/:id', verifyToken, requireRole(FM, SO, DISP), getDriver);
-router.put('/:id', verifyToken, requireRole(SO, FM), validate(updateDriverSchema), updateDriver);
-router.patch('/:id/status', verifyToken, requireRole(SO, FM), validate(patchDriverStatusSchema), patchDriverStatus);
-router.delete('/:id', verifyToken, requireRole(FM), deleteDriver);
+router.get('/', verifyToken, requireRole(...rolesFor('drivers', 'read')), listDrivers);
+router.post('/', verifyToken, requireRole(...rolesFor('drivers', 'write')), validate(createDriverSchema), createDriver);
+router.get('/:id', verifyToken, requireRole(...rolesFor('drivers', 'read')), getDriver);
+router.put('/:id', verifyToken, requireRole(...rolesFor('drivers', 'write')), validate(updateDriverSchema), updateDriver);
+router.patch('/:id/status', verifyToken, requireRole(...rolesFor('drivers', 'write')), validate(patchDriverStatusSchema), patchDriverStatus);
+router.delete('/:id', verifyToken, requireRole(...rolesFor('drivers', 'write')), deleteDriver);
 
 module.exports = router;

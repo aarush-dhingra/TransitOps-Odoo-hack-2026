@@ -7,6 +7,7 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import EmptyState from '../../components/shared/EmptyState';
 import { formatDate } from '../../lib/utils';
 import { toast } from 'sonner';
+import { usePermissions } from '../../hooks/useAuth';
 
 const DRIVER_STATUSES   = ['AVAILABLE', 'ON_TRIP', 'OFF_DUTY', 'ON_LEAVE', 'SUSPENDED'];
 const LICENSE_CATEGORIES = ['LMV', 'HMV', 'HPMV', 'TRANS'];
@@ -33,6 +34,8 @@ function isExpired(dateStr) {
 }
 
 export default function DriversPage() {
+  const { canWrite } = usePermissions();
+  const canEditDrivers = canWrite('drivers');
   const [drivers,    setDrivers]    = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState('');
@@ -40,6 +43,7 @@ export default function DriversPage() {
   const [editing,    setEditing]    = useState(null);
   const [form,       setForm]       = useState(EMPTY_FORM);
   const [saving,     setSaving]     = useState(false);
+  const todayStr = new Date().toISOString().split('T')[0];
 
   const fetchDrivers = useCallback(async () => {
     setLoading(true);
@@ -111,11 +115,11 @@ export default function DriversPage() {
       <PageHeader
         title="Drivers & Safety Profiles"
         subtitle="Manage drivers, licenses, and safety scores"
-        action={
+        action={canEditDrivers ? (
           <button onClick={openCreate} className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold px-4 py-2 rounded-md text-sm transition-colors">
             <Plus className="w-4 h-4" /> Add Driver
           </button>
-        }
+        ) : null}
       />
 
       <p className="text-xs text-amber-400/80">
@@ -152,7 +156,10 @@ export default function DriversPage() {
                   return (
                     <tr key={d.id} className="hover:bg-slate-800/50 transition-colors">
                       <td className="px-5 py-3">
-                        <button onClick={() => openEdit(d)} className="text-slate-200 hover:text-amber-400 text-left font-medium transition-colors">
+                        <button
+                          onClick={() => canEditDrivers && openEdit(d)}
+                          className={`text-slate-200 text-left font-medium transition-colors ${canEditDrivers ? 'hover:text-amber-400' : ''}`}
+                        >
                           {d.name}
                         </button>
                       </td>
@@ -173,22 +180,26 @@ export default function DriversPage() {
                       </td>
                       <td className="px-5 py-3"><StatusBadge status={d.status} /></td>
                       <td className="px-5 py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {['AVAILABLE', 'OFF_DUTY', 'SUSPENDED'].map((s) => (
-                            <button
-                              key={s}
-                              onClick={() => handleStatusToggle(d, s)}
-                              disabled={d.status === s}
-                              className={`px-2 py-0.5 rounded text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-default
-                                ${s === 'AVAILABLE'  ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : ''}
-                                ${s === 'OFF_DUTY'   ? 'bg-slate-500/20 text-slate-400 hover:bg-slate-500/30' : ''}
-                                ${s === 'SUSPENDED'  ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30' : ''}
-                              `}
-                            >
-                              {s.replace('_', ' ')}
-                            </button>
-                          ))}
-                        </div>
+                        {canEditDrivers ? (
+                          <div className="flex flex-wrap gap-1">
+                            {['AVAILABLE', 'OFF_DUTY', 'SUSPENDED'].map((s) => (
+                              <button
+                                key={s}
+                                onClick={() => handleStatusToggle(d, s)}
+                                disabled={d.status === s}
+                                className={`px-2 py-0.5 rounded text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-default
+                                  ${s === 'AVAILABLE'  ? 'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30' : ''}
+                                  ${s === 'OFF_DUTY'   ? 'bg-slate-500/20 text-slate-400 hover:bg-slate-500/30' : ''}
+                                  ${s === 'SUSPENDED'  ? 'bg-orange-500/20 text-orange-400 hover:bg-orange-500/30' : ''}
+                                `}
+                              >
+                                {s.replace('_', ' ')}
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-slate-600">—</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -200,7 +211,7 @@ export default function DriversPage() {
       )}
 
       {/* Drawer */}
-      {drawerOpen && (
+      {drawerOpen && canEditDrivers && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/50" onClick={() => setDrawerOpen(false)} />
           <div className="relative w-full max-w-md bg-slate-900 border-l border-slate-800 overflow-y-auto p-6 space-y-4">
@@ -214,18 +225,23 @@ export default function DriversPage() {
             <form onSubmit={handleSave} className="space-y-4">
               {[
                 { label: 'Full Name',       key: 'name',          required: true },
-                { label: 'Phone',           key: 'phone',         required: true },
-                { label: 'Email',           key: 'email' },
-                { label: 'License Number',  key: 'licenseNumber', required: true },
-                { label: 'License Expiry',  key: 'licenseExpiry', type: 'date', required: true },
-              ].map(({ label, key, type = 'text', required }) => (
+                { label: 'Phone',           key: 'phone',         type: 'tel', required: true, pattern: '[0-9]{10}', maxLength: 10, title: 'Phone number must be exactly 10 digits', onKeyPress: (e) => { if (!/[0-9]/.test(e.key)) e.preventDefault(); } },
+                { label: 'Email',           key: 'email',         type: 'email' },
+                { label: 'License Number',  key: 'licenseNumber', required: true, pattern: '^[A-Za-z0-9]{10,16}$', maxLength: 16, title: 'License must be 10-16 alphanumeric characters', onChangeTransform: (v) => v.toUpperCase() },
+                { label: 'License Expiry',  key: 'licenseExpiry', type: 'date', required: true, min: todayStr },
+              ].map(({ label, key, type = 'text', required, pattern, maxLength, title, min, onKeyPress, onChangeTransform }) => (
                 <div key={key}>
                   <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">{label}</label>
                   <input
                     type={type}
                     required={required}
+                    pattern={pattern}
+                    maxLength={maxLength}
+                    title={title}
+                    min={min}
+                    onKeyPress={onKeyPress}
                     value={form[key]}
-                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
+                    onChange={(e) => setForm((f) => ({ ...f, [key]: onChangeTransform ? onChangeTransform(e.target.value) : e.target.value }))}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
                   />
                 </div>

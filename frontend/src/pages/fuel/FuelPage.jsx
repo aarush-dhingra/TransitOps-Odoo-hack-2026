@@ -9,6 +9,7 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import EmptyState from '../../components/shared/EmptyState';
 import { formatDate, formatCurrency } from '../../lib/utils';
 import { toast } from 'sonner';
+import { usePermissions } from '../../hooks/useAuth';
 
 const EXPENSE_CATEGORIES = ['FUEL', 'TOLL', 'PARKING', 'DRIVER_ALLOWANCE', 'LOADING', 'OTHER'];
 
@@ -32,6 +33,9 @@ const EMPTY_EXPENSE = {
 };
 
 export default function FuelPage() {
+  const { canWrite, canRead } = usePermissions();
+  const canEditFuel = canWrite('fuel');
+  const canViewTrips = canRead('trips');
   const [fuelLogs,   setFuelLogs]   = useState([]);
   const [expenses,   setExpenses]   = useState([]);
   const [vehicles,   setVehicles]   = useState([]);
@@ -44,6 +48,7 @@ export default function FuelPage() {
   const [fuelForm,      setFuelForm]      = useState(EMPTY_FUEL);
   const [expForm,       setExpForm]       = useState(EMPTY_EXPENSE);
   const [saving,        setSaving]        = useState(false);
+  const todayStr = new Date().toISOString().split('T')[0];
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
@@ -53,7 +58,7 @@ export default function FuelPage() {
         getFuelLogs(),
         getExpenses(),
         getVehicles(),
-        getTrips(),
+        canViewTrips ? getTrips() : Promise.resolve({ data: { data: [] } }),
       ]);
       setFuelLogs(fRes.data.data  ?? []);
       setExpenses(eRes.data.data  ?? []);
@@ -64,7 +69,7 @@ export default function FuelPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [canViewTrips]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -157,10 +162,12 @@ export default function FuelPage() {
           <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-white">Fuel Logs</h2>
-              <button onClick={() => setFuelDrawer(true)}
-                className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold px-3 py-1.5 rounded-md text-xs transition-colors">
-                <Plus className="w-3.5 h-3.5" /> Log Fuel
-              </button>
+              {canEditFuel && (
+                <button onClick={() => setFuelDrawer(true)}
+                  className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold px-3 py-1.5 rounded-md text-xs transition-colors">
+                  <Plus className="w-3.5 h-3.5" /> Log Fuel
+                </button>
+              )}
             </div>
             {fuelLogs.length === 0 ? (
               <EmptyState title="No fuel logs" message="Log the first refuel to see data here." />
@@ -176,7 +183,7 @@ export default function FuelPage() {
                       <th className="px-5 py-3 text-right">Fuel Cost</th>
                       <th className="px-5 py-3 text-right">Odometer</th>
                       <th className="px-5 py-3 text-left">Location</th>
-                      <th className="px-5 py-3" />
+                      {canEditFuel && <th className="px-5 py-3" />}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
@@ -189,11 +196,13 @@ export default function FuelPage() {
                         <td className="px-5 py-3 text-right text-slate-200 font-medium">{formatCurrency(l.totalCost)}</td>
                         <td className="px-5 py-3 text-right text-slate-400 text-xs">{l.odometerAtFill?.toLocaleString('en-IN')} km</td>
                         <td className="px-5 py-3 text-slate-400 text-xs">{l.location ?? '—'}</td>
-                        <td className="px-5 py-3">
-                          <button onClick={() => handleDeleteFuel(l.id)} className="text-slate-600 hover:text-red-400 transition-colors">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
+                        {canEditFuel && (
+                          <td className="px-5 py-3">
+                            <button onClick={() => handleDeleteFuel(l.id)} className="text-slate-600 hover:text-red-400 transition-colors">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -206,10 +215,12 @@ export default function FuelPage() {
           <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-white">Other Expenses (Toll / Misc)</h2>
-              <button onClick={() => setExpenseDrawer(true)}
-                className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold px-3 py-1.5 rounded-md text-xs transition-colors">
-                <Plus className="w-3.5 h-3.5" /> Add Expense
-              </button>
+              {canEditFuel && (
+                <button onClick={() => setExpenseDrawer(true)}
+                  className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold px-3 py-1.5 rounded-md text-xs transition-colors">
+                  <Plus className="w-3.5 h-3.5" /> Add Expense
+                </button>
+              )}
             </div>
             {expenses.length === 0 ? (
               <EmptyState title="No expenses logged" message="Add an expense to track operational costs." />
@@ -224,7 +235,7 @@ export default function FuelPage() {
                       <th className="px-5 py-3 text-left">Date</th>
                       <th className="px-5 py-3 text-right">Amount</th>
                       <th className="px-5 py-3 text-left">Description</th>
-                      <th className="px-5 py-3" />
+                      {canEditFuel && <th className="px-5 py-3" />}
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
@@ -236,11 +247,13 @@ export default function FuelPage() {
                         <td className="px-5 py-3 text-slate-400 text-xs">{formatDate(ex.date)}</td>
                         <td className="px-5 py-3 text-right text-slate-200 font-medium">{formatCurrency(ex.amount)}</td>
                         <td className="px-5 py-3 text-slate-400 text-xs">{ex.description ?? '—'}</td>
-                        <td className="px-5 py-3">
-                          <button onClick={() => handleDeleteExpense(ex.id)} className="text-slate-600 hover:text-red-400 transition-colors">
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </td>
+                        {canEditFuel && (
+                          <td className="px-5 py-3">
+                            <button onClick={() => handleDeleteExpense(ex.id)} className="text-slate-600 hover:text-red-400 transition-colors">
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>
@@ -260,7 +273,7 @@ export default function FuelPage() {
       )}
 
       {/* ── Fuel Log Drawer ── */}
-      {fuelDrawer && (
+      {fuelDrawer && canEditFuel && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/50" onClick={() => setFuelDrawer(false)} />
           <div className="relative w-full max-w-md bg-slate-900 border-l border-slate-800 overflow-y-auto p-6 space-y-4">
@@ -277,24 +290,26 @@ export default function FuelPage() {
                   {vehicles.map((v) => <option key={v.id} value={v.id}>{v.registrationNumber}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Trip (optional)</label>
-                <select value={fuelForm.tripId} onChange={(e) => setFuelForm((f) => ({ ...f, tripId: e.target.value }))}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500">
-                  <option value="">None</option>
-                  {trips.map((t) => <option key={t.id} value={t.id}>{t.tripNumber}</option>)}
-                </select>
-              </div>
+              {canViewTrips && (
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Trip (optional)</label>
+                  <select value={fuelForm.tripId} onChange={(e) => setFuelForm((f) => ({ ...f, tripId: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500">
+                    <option value="">None</option>
+                    {trips.map((t) => <option key={t.id} value={t.id}>{t.tripNumber}</option>)}
+                  </select>
+                </div>
+              )}
               {[
-                { label: 'Date',           key: 'date',           type: 'date',   required: true },
-                { label: 'Litres',         key: 'litres',         type: 'number', required: true },
-                { label: 'Price per Litre',key: 'pricePerLitre',  type: 'number', required: true },
-                { label: 'Odometer (km)',  key: 'odometerAtFill', type: 'number', required: true },
+                { label: 'Date',           key: 'date',           type: 'date',   required: true, max: todayStr },
+                { label: 'Litres',         key: 'litres',         type: 'number', required: true, min: 0, step: 'any' },
+                { label: 'Price per Litre',key: 'pricePerLitre',  type: 'number', required: true, min: 0, step: 'any' },
+                { label: 'Odometer (km)',  key: 'odometerAtFill', type: 'number', required: true, min: 0, step: 'any' },
                 { label: 'Location',       key: 'location' },
-              ].map(({ label, key, type = 'text', required }) => (
+              ].map(({ label, key, type = 'text', required, min, max, step }) => (
                 <div key={key}>
                   <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">{label}</label>
-                  <input type={type} required={required} value={fuelForm[key]}
+                  <input type={type} required={required} min={min} max={max} step={step} value={fuelForm[key]}
                     onChange={(e) => setFuelForm((f) => ({ ...f, [key]: e.target.value }))}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500" />
                 </div>
@@ -318,7 +333,7 @@ export default function FuelPage() {
       )}
 
       {/* ── Expense Drawer ── */}
-      {expenseDrawer && (
+      {expenseDrawer && canEditFuel && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/50" onClick={() => setExpenseDrawer(false)} />
           <div className="relative w-full max-w-md bg-slate-900 border-l border-slate-800 overflow-y-auto p-6 space-y-4">
@@ -335,14 +350,16 @@ export default function FuelPage() {
                   {vehicles.map((v) => <option key={v.id} value={v.id}>{v.registrationNumber}</option>)}
                 </select>
               </div>
-              <div>
-                <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Trip (optional)</label>
-                <select value={expForm.tripId} onChange={(e) => setExpForm((f) => ({ ...f, tripId: e.target.value }))}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500">
-                  <option value="">None</option>
-                  {trips.map((t) => <option key={t.id} value={t.id}>{t.tripNumber}</option>)}
-                </select>
-              </div>
+              {canViewTrips && (
+                <div>
+                  <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Trip (optional)</label>
+                  <select value={expForm.tripId} onChange={(e) => setExpForm((f) => ({ ...f, tripId: e.target.value }))}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500">
+                    <option value="">None</option>
+                    {trips.map((t) => <option key={t.id} value={t.id}>{t.tripNumber}</option>)}
+                  </select>
+                </div>
+              )}
               <div>
                 <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Category</label>
                 <select value={expForm.category} onChange={(e) => setExpForm((f) => ({ ...f, category: e.target.value }))}
@@ -351,13 +368,13 @@ export default function FuelPage() {
                 </select>
               </div>
               {[
-                { label: 'Amount (₹)', key: 'amount',      type: 'number', required: true },
-                { label: 'Date',       key: 'date',        type: 'date',   required: true },
+                { label: 'Amount (₹)', key: 'amount',      type: 'number', required: true, min: 0, step: 'any' },
+                { label: 'Date',       key: 'date',        type: 'date',   required: true, max: todayStr },
                 { label: 'Description',key: 'description' },
-              ].map(({ label, key, type = 'text', required }) => (
+              ].map(({ label, key, type = 'text', required, min, max, step }) => (
                 <div key={key}>
                   <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">{label}</label>
-                  <input type={type} required={required} value={expForm[key]}
+                  <input type={type} required={required} min={min} max={max} step={step} value={expForm[key]}
                     onChange={(e) => setExpForm((f) => ({ ...f, [key]: e.target.value }))}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500" />
                 </div>

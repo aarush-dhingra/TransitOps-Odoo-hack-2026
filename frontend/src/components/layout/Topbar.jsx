@@ -2,6 +2,7 @@ import { Search } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 
 const ROLE_LABELS = {
+  ADMIN:            'Admin',
   FLEET_MANAGER:    'Fleet Mgr',
   DISPATCHER:       'Dispatcher',
   SAFETY_OFFICER:   'Safety Off.',
@@ -9,6 +10,7 @@ const ROLE_LABELS = {
 };
 
 const ROLE_COLORS = {
+  ADMIN:            'bg-red-600 text-white',
   FLEET_MANAGER:    'bg-blue-600 text-white',
   DISPATCHER:       'bg-amber-500 text-slate-900',
   SAFETY_OFFICER:   'bg-emerald-600 text-white',
@@ -22,14 +24,14 @@ export default function Topbar() {
     : '??';
 
   return (
-    <header className="sticky top-0 z-10 flex items-center gap-4 px-6 py-3 bg-slate-900 border-b border-slate-800 shrink-0">
+    <header className="sticky top-0 z-10 flex items-center gap-4 px-6 py-3 glass border-b border-white/5 shrink-0 animate-fade-in">
       {/* Search */}
       <div className="flex-1 max-w-sm relative">
         <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
         <input
           type="search"
           placeholder="Search..."
-          className="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-800 border border-slate-700 rounded-md text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500"
+          className="w-full pl-9 pr-3 py-1.5 text-sm bg-slate-900/50 border border-white/10 rounded-full text-slate-200 placeholder:text-slate-500 focus:outline-none focus:ring-1 focus:ring-amber-500 transition-all focus:bg-slate-800"
         />
       </div>
 
@@ -43,7 +45,7 @@ export default function Topbar() {
         </span>
 
         {/* Avatar */}
-        <div className="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center text-xs font-bold text-white select-none">
+        <div className="w-8 h-8 rounded-full bg-amber-500/20 border border-amber-500/50 flex items-center justify-center text-xs font-bold text-amber-500 select-none shadow-[0_0_10px_rgba(245,158,11,0.2)]">
           {initials}
         </div>
       </div>

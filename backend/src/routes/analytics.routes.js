@@ -3,6 +3,7 @@
 const { Router } = require('express');
 
 const { verifyToken, requireRole } = require('../middleware/auth');
+const { rolesFor } = require('../lib/permissions');
 const {
   getDashboard,
   getAlerts,
@@ -13,14 +14,10 @@ const {
 
 const router = Router();
 
-const FM = 'FLEET_MANAGER';
-const FA = 'FINANCIAL_ANALYST';
-const SO = 'SAFETY_OFFICER';
-
-router.get('/dashboard', verifyToken, requireRole(FM), getDashboard);
-router.get('/alerts', verifyToken, requireRole(FM, SO), getAlerts);
-router.get('/utilization', verifyToken, requireRole(FM), getUtilization);
-router.get('/fuel-efficiency', verifyToken, requireRole(FM, FA), getFuelEfficiency);
-router.get('/costs', verifyToken, requireRole(FM, FA), getCosts);
+router.get('/dashboard', verifyToken, requireRole(...rolesFor('dashboard', 'read')), getDashboard);
+router.get('/alerts', verifyToken, requireRole(...rolesFor('analytics', 'read')), getAlerts);
+router.get('/utilization', verifyToken, requireRole(...rolesFor('analytics', 'read')), getUtilization);
+router.get('/fuel-efficiency', verifyToken, requireRole(...rolesFor('analytics', 'read')), getFuelEfficiency);
+router.get('/costs', verifyToken, requireRole(...rolesFor('analytics', 'read')), getCosts);
 
 module.exports = router;

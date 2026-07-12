@@ -10,6 +10,6 @@ const router = Router();
 
 router.post('/login', validate(loginSchema), login);
 router.get('/me', verifyToken, me);
-router.post('/register', verifyToken, requireRole('FLEET_MANAGER'), validate(registerSchema), register);
+router.post('/register', verifyToken, requireRole('ADMIN', 'FLEET_MANAGER'), validate(registerSchema), register);
 
 module.exports = router;

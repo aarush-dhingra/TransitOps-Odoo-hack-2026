@@ -40,3 +40,37 @@
 /* Leaflet map z-index fix inside dialogs */
 .leaflet-pane { z-index: 1; }
 .leaflet-top, .leaflet-bottom { z-index: 2; }
+
+@layer utilities {
+  .glass {
+    @apply bg-slate-900/40 backdrop-blur-md border border-white/10 shadow-xl;
+  }
+  .glass-panel {
+    @apply bg-slate-900/60 backdrop-blur-lg border border-white/5 shadow-2xl;
+  }
+  .devpulse-panel {
+    @apply bg-[#111111] border border-[#222222] rounded-xl shadow-lg;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+body {
+  background-color: #0a0a0a;
+  background-image: radial-gradient(circle at top right, #111111, transparent 400px);
+  background-attachment: fixed;
+}

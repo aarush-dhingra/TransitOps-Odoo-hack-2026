@@ -8,6 +8,7 @@ import EmptyState from '../../components/shared/EmptyState';
 import { formatDate, formatCurrency } from '../../lib/utils';
 import { toast } from 'sonner';
 import { ArrowRight } from 'lucide-react';
+import { usePermissions } from '../../hooks/useAuth';
 
 const MAINTENANCE_TYPES  = ['OIL_CHANGE', 'TYRE_ROTATION', 'FULL_SERVICE', 'BRAKE_SERVICE', 'ENGINE_CHECK', 'OTHER'];
 const MAINTENANCE_STATUS = ['SCHEDULED', 'IN_PROGRESS', 'COMPLETED'];
@@ -25,6 +26,8 @@ const EMPTY_FORM = {
 };
 
 export default function MaintenancePage() {
+  const { canWrite } = usePermissions();
+  const canEditMaintenance = canWrite('maintenance');
   const [logs,      setLogs]      = useState([]);
   const [vehicles,  setVehicles]  = useState([]);
   const [loading,   setLoading]   = useState(true);
@@ -53,6 +56,7 @@ export default function MaintenancePage() {
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const loadEdit = (log) => {
+    if (!canEditMaintenance) return;
     setEditingId(log.id);
     setForm({
       vehicleId:         log.vehicleId,
@@ -105,6 +109,7 @@ export default function MaintenancePage() {
 
       <div className="grid grid-cols-1 xl:grid-cols-5 gap-6">
         {/* Log Service Record form */}
+        {canEditMaintenance && (
         <div className="xl:col-span-2 space-y-4">
           <div className="bg-slate-900 rounded-xl border border-slate-800 p-5">
             <h2 className="text-sm font-semibold text-white mb-4">
@@ -141,17 +146,19 @@ export default function MaintenancePage() {
               </div>
 
               {[
-                { label: 'Cost (₹)',              key: 'cost',              type: 'number' },
+                { label: 'Cost (₹)',              key: 'cost',              type: 'number', min: 0, step: 'any' },
                 { label: 'Date',                  key: 'date',              type: 'date', required: true },
-                { label: 'Odometer at Service',   key: 'odometerAtService', type: 'number' },
+                { label: 'Odometer at Service',   key: 'odometerAtService', type: 'number', min: 0 },
                 { label: 'Vendor Name',           key: 'vendorName' },
                 { label: 'Vendor Contact',        key: 'vendorContact' },
-              ].map(({ label, key, type = 'text', required }) => (
+              ].map(({ label, key, type = 'text', required, min, step }) => (
                 <div key={key}>
                   <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">{label}</label>
                   <input
                     type={type}
                     required={required}
+                    min={min}
+                    step={step}
                     value={form[key]}
                     onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -212,9 +219,10 @@ export default function MaintenancePage() {
             </div>
           </div>
         </div>
+        )}
 
         {/* Service Log table */}
-        <div className="xl:col-span-3">
+        <div className={canEditMaintenance ? 'xl:col-span-3' : 'xl:col-span-5'}>
           {loading ? (
             <LoadingSpinner />
           ) : error ? (
@@ -242,8 +250,8 @@ export default function MaintenancePage() {
                     {logs.map((log) => (
                       <tr
                         key={log.id}
-                        onClick={() => loadEdit(log)}
-                        className="hover:bg-slate-800/50 transition-colors cursor-pointer"
+                        onClick={() => canEditMaintenance && loadEdit(log)}
+                        className={`hover:bg-slate-800/50 transition-colors ${canEditMaintenance ? 'cursor-pointer' : ''}`}
                       >
                         <td className="px-5 py-3 font-mono text-xs text-slate-300">{vehicleName(log.vehicleId)}</td>
                         <td className="px-5 py-3 text-slate-300">{log.type.replace(/_/g, ' ')}</td>

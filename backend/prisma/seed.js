@@ -12,6 +12,17 @@ async function main() {
 
   // ─── ERP Users ─────────────────────────────────────────────────────────────
 
+  const admin = await prisma.user.upsert({
+    where: { email: 'admin@transitops.dev' },
+    update: {},
+    create: {
+      name: 'System Admin',
+      email: 'admin@transitops.dev',
+      passwordHash: await bcrypt.hash('password123', HASH_ROUNDS),
+      role: 'ADMIN',
+    },
+  });
+
   const fleetManager = await prisma.user.upsert({
     where: { email: 'fleet@transitops.dev' },
     update: {},

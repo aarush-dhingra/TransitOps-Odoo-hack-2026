@@ -9,6 +9,7 @@ import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import EmptyState from '../../components/shared/EmptyState';
 import { formatDateTime } from '../../lib/utils';
 import { toast } from 'sonner';
+import { usePermissions } from '../../hooks/useAuth';
 
 const LIFECYCLE = ['PENDING', 'DISPATCHED', 'ACTIVE', 'COMPLETED', 'CANCELLED'];
 
@@ -28,6 +29,8 @@ const EMPTY_FORM = {
 };
 
 export default function TripsPage() {
+  const { canWrite } = usePermissions();
+  const canEditTrips = canWrite('trips');
   const [trips,      setTrips]      = useState([]);
   const [vehicles,   setVehicles]   = useState([]);
   const [drivers,    setDrivers]    = useState([]);
@@ -37,6 +40,10 @@ export default function TripsPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [form,       setForm]       = useState(EMPTY_FORM);
   const [saving,     setSaving]     = useState(false);
+  
+  // Format current datetime for datetime-local min attribute
+  const now = new Date();
+  const todayDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
 
   // Capacity validation
   const selectedVehicle = vehicles.find((v) => v.id === form.vehicleId);
@@ -133,11 +140,11 @@ export default function TripsPage() {
       <PageHeader
         title="Trip Dispatcher"
         subtitle="Create and manage trips across the fleet"
-        action={
+        action={canEditTrips ? (
           <button onClick={() => setDrawerOpen(true)} className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold px-4 py-2 rounded-md text-sm transition-colors">
             <Plus className="w-4 h-4" /> New Trip
           </button>
-        }
+        ) : null}
       />
 
       {/* Status filter */}
@@ -189,27 +196,28 @@ export default function TripsPage() {
                         <p className="text-xs text-slate-600 mt-0.5">{formatDateTime(t.plannedDeparture)}</p>
                       </div>
 
-                      {/* Action buttons */}
-                      <div className="flex flex-col gap-1.5 shrink-0">
-                        {t.status === 'PENDING' && (
-                          <button onClick={() => handleDispatch(t.id)}
-                            className="px-3 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-xs font-medium hover:bg-blue-500/30 transition-colors">
-                            Dispatch
-                          </button>
-                        )}
-                        {(t.status === 'DISPATCHED' || t.status === 'ACTIVE') && (
-                          <button onClick={() => handleComplete(t.id)}
-                            className="px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-xs font-medium hover:bg-emerald-500/30 transition-colors">
-                            Complete
-                          </button>
-                        )}
-                        {(t.status === 'PENDING' || t.status === 'DISPATCHED') && (
-                          <button onClick={() => handleCancel(t.id)}
-                            className="px-3 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs font-medium hover:bg-red-500/30 transition-colors">
-                            Cancel
-                          </button>
-                        )}
-                      </div>
+                      {canEditTrips && (
+                        <div className="flex flex-col gap-1.5 shrink-0">
+                          {t.status === 'PENDING' && (
+                            <button onClick={() => handleDispatch(t.id)}
+                              className="px-3 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-xs font-medium hover:bg-blue-500/30 transition-colors">
+                              Dispatch
+                            </button>
+                          )}
+                          {(t.status === 'DISPATCHED' || t.status === 'ACTIVE') && (
+                            <button onClick={() => handleComplete(t.id)}
+                              className="px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-xs font-medium hover:bg-emerald-500/30 transition-colors">
+                              Complete
+                            </button>
+                          )}
+                          {(t.status === 'PENDING' || t.status === 'DISPATCHED') && (
+                            <button onClick={() => handleCancel(t.id)}
+                              className="px-3 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs font-medium hover:bg-red-500/30 transition-colors">
+                              Cancel
+                            </button>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -242,7 +250,7 @@ export default function TripsPage() {
       </div>
 
       {/* Create Trip Drawer */}
-      {drawerOpen && (
+      {drawerOpen && canEditTrips && (
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/50" onClick={() => setDrawerOpen(false)} />
           <div className="relative w-full max-w-md bg-slate-900 border-l border-slate-800 overflow-y-auto p-6 space-y-4">
@@ -256,19 +264,21 @@ export default function TripsPage() {
             <form onSubmit={handleCreate} className="space-y-4">
               {[
                 { label: 'Source / Origin',          key: 'originAddress',      required: true },
-                { label: 'Origin Lat',               key: 'originLat',          type: 'number' },
-                { label: 'Origin Lng',               key: 'originLng',          type: 'number' },
+                { label: 'Origin Lat',               key: 'originLat',          type: 'number', step: 'any' },
+                { label: 'Origin Lng',               key: 'originLng',          type: 'number', step: 'any' },
                 { label: 'Destination',              key: 'destinationAddress', required: true },
-                { label: 'Destination Lat',          key: 'destinationLat',     type: 'number' },
-                { label: 'Destination Lng',          key: 'destinationLng',     type: 'number' },
-                { label: 'Planned Distance (km)',    key: 'distanceKm',         type: 'number' },
-                { label: 'Planned Departure',        key: 'plannedDeparture',   type: 'datetime-local', required: true },
-              ].map(({ label, key, type = 'text', required }) => (
+                { label: 'Destination Lat',          key: 'destinationLat',     type: 'number', step: 'any' },
+                { label: 'Destination Lng',          key: 'destinationLng',     type: 'number', step: 'any' },
+                { label: 'Planned Distance (km)',    key: 'distanceKm',         type: 'number', min: 0, step: 'any' },
+                { label: 'Planned Departure',        key: 'plannedDeparture',   type: 'datetime-local', required: true, min: todayDateTime },
+              ].map(({ label, key, type = 'text', required, min, step }) => (
                 <div key={key}>
                   <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">{label}</label>
                   <input
                     type={type}
                     required={required}
+                    min={min}
+                    step={step}
                     value={form[key]}
                     onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
@@ -313,6 +323,8 @@ export default function TripsPage() {
                 <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Cargo Weight (kg)</label>
                 <input
                   type="number"
+                  min="0"
+                  step="any"
                   value={form.cargoWeight}
                   onChange={(e) => setForm((f) => ({ ...f, cargoWeight: e.target.value }))}
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
