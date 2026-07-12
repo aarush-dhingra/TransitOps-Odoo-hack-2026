@@ -48,60 +48,61 @@ body {
 
 /* ─── Light mode palette ─────────────────────────────────────────── */
 /*
-  Industry-standard SaaS dashboard light mode (WCAG AA compliant):
-  Page bg:      #F8FAFC  (slate-50 — quieter than cards)
-  Surface:      #FFFFFF  + layered shadow
-  Sidebar:      #FFFFFF  with right border
-  Topbar:       #FFFFFF  with bottom border
-  Table head:   #F1F5F9  (slate-100)
-  Row hover:    #EFF6FF  (blue-50 — subtle brand tint)
-  Borders:      #E2E8F0  (slate-200)
-  Text-h:       #0F172A  (slate-900)
-  Text-body:    #334155  (slate-700)
-  Text-muted:   #64748B  (slate-500 — 4.6:1 on white, WCAG AA ✓)
-  Text-faint:   #94A3B8  (slate-400 — labels, placeholders)
+  Warm off-white + blue accent (WCAG AA compliant):
+  Page bg:      #FAF8F4  (warm cream — amber undertone, not clinical white)
+  Surface:      #FFFFFF  + blue-tinted shadow
+  Sidebar:      #FFFFFF  with blue border
+  Topbar:       #FFFFFF  with blue border
+  Table head:   #EBF3FF  (blue-50 tint)
+  Row hover:    #DBEAFE  (blue-100)
+  Borders:      #C7D7F0  (blue-200 — structured but soft)
+  Dividers:     #E0EDFF  (very light blue)
+  Text-h:       #0F172A
+  Text-body:    #334155
+  Text-muted:   #64748B  (WCAG AA ✓)
+  Text-faint:   #94A3B8
 */
 
 html.light body {
-  background-color: #F8FAFC;
+  background-color: #FAF8F4;
   background-image:
-    radial-gradient(ellipse at 80% 0%, rgba(245,158,11,0.06) 0%, transparent 50%),
-    radial-gradient(ellipse at 0% 100%, rgba(99,102,241,0.04) 0%, transparent 40%);
+    radial-gradient(ellipse at 78% 0%, rgba(245,158,11,0.07) 0%, transparent 45%),
+    radial-gradient(ellipse at 5% 95%, rgba(59,130,246,0.06) 0%, transparent 40%);
   color: #0F172A;
 }
 
-html.light ::-webkit-scrollbar-track { background: #F1F5F9; }
-html.light ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 10px; }
-html.light ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+html.light ::-webkit-scrollbar-track { background: #EBF3FF; }
+html.light ::-webkit-scrollbar-thumb { background: #93C5FD; border-radius: 10px; }
+html.light ::-webkit-scrollbar-thumb:hover { background: #60A5FA; }
 
 /* ── Panel surfaces ── */
 html.light .glass-panel {
   background: #FFFFFF !important;
-  border: 1px solid #E2E8F0 !important;
-  box-shadow: 0 1px 2px rgba(15,23,42,0.04), 0 4px 16px rgba(15,23,42,0.06) !important;
+  border: 1px solid #C7D7F0 !important;
+  box-shadow: 0 1px 3px rgba(37,99,235,0.05), 0 4px 16px rgba(37,99,235,0.06) !important;
   backdrop-filter: none !important;
 }
 html.light .glass {
   background: #FFFFFF !important;
-  border: 1px solid #E2E8F0 !important;
-  box-shadow: 0 1px 3px rgba(15,23,42,0.05) !important;
+  border: 1px solid #C7D7F0 !important;
+  box-shadow: 0 1px 2px rgba(37,99,235,0.04) !important;
   backdrop-filter: none !important;
 }
 html.light .devpulse-panel {
   background: #FFFFFF !important;
-  border: 1px solid #E2E8F0 !important;
-  box-shadow: 0 1px 3px rgba(15,23,42,0.05), 0 4px 12px rgba(15,23,42,0.04) !important;
+  border: 1px solid #C7D7F0 !important;
+  box-shadow: 0 1px 3px rgba(37,99,235,0.04), 0 4px 12px rgba(37,99,235,0.05) !important;
 }
 
 /* ── Table internals ── */
 html.light .thead-row {
-  background-color: #F1F5F9 !important;
-  border-color: #E2E8F0 !important;
-  color: #64748B !important;
+  background-color: #EBF3FF !important;
+  border-color: #C7D7F0 !important;
+  color: #3B82F6 !important;
 }
-html.light .tbody-row { border-color: #F1F5F9 !important; }
-html.light .tbody-row:hover { background-color: #EFF6FF !important; }
-html.light .divide-y > * + * { border-color: #F1F5F9 !important; }
+html.light .tbody-row { border-color: #E0EDFF !important; }
+html.light .tbody-row:hover { background-color: #DBEAFE !important; }
+html.light .divide-y > * + * { border-color: #E0EDFF !important; }
 
 /* ── Text hierarchy — scoped to panels so status badges/buttons keep their colors ── */
 html.light .glass-panel .text-white,
@@ -152,46 +153,46 @@ html.light header.glass .text-slate-500 { color: #94A3B8 !important; }
 
 /* Topbar search input */
 html.light header.glass input[type="search"] {
-  background-color: #F8FAFC !important;
-  border-color: #E2E8F0 !important;
+  background-color: #EBF3FF !important;
+  border-color: #BFDBFE !important;
   color: #0F172A !important;
 }
-html.light header.glass input[type="search"]::placeholder { color: #94A3B8 !important; }
+html.light header.glass input[type="search"]::placeholder { color: #93C5FD !important; }
 
 /* Topbar icon buttons */
 html.light header.glass button:not(.btn-amber) {
   color: #64748B;
 }
 html.light header.glass button:not(.btn-amber):hover {
-  color: #0F172A;
-  background-color: #F1F5F9;
+  color: #1D4ED8;
+  background-color: #EBF3FF;
 }
 
 /* ── Sidebar specific ── */
 html.light aside.glass-panel {
   background: #FFFFFF !important;
-  border-right-color: #E2E8F0 !important;
+  border-right-color: #C7D7F0 !important;
 }
 
 /* Sidebar logo area border */
-html.light aside.glass-panel > div:first-child.border-b { border-color: #F1F5F9 !important; }
+html.light aside.glass-panel > div:first-child.border-b { border-color: #EBF3FF !important; }
 
 /* Nav section label */
-html.light aside.glass-panel .text-slate-600 { color: #94A3B8 !important; }
+html.light aside.glass-panel .text-slate-600 { color: #93C5FD !important; }
 
 /* Nav inactive links */
-html.light aside.glass-panel nav a { color: #64748B !important; }
+html.light aside.glass-panel nav a { color: #475569 !important; }
 html.light aside.glass-panel nav a:hover {
-  color: #0F172A !important;
-  background-color: #F1F5F9 !important;
+  color: #1D4ED8 !important;
+  background-color: #EBF3FF !important;
 }
 
 /* Sidebar bottom border */
-html.light aside.glass-panel .border-t { border-color: #F1F5F9 !important; }
+html.light aside.glass-panel .border-t { border-color: #EBF3FF !important; }
 
 /* User name in sidebar */
 html.light aside.glass-panel .text-slate-200 { color: #1E293B !important; }
-html.light aside.glass-panel .text-slate-500 { color: #94A3B8 !important; }
+html.light aside.glass-panel .text-slate-500 { color: #93C5FD !important; }
 
 /* Sign out button */
 html.light aside.glass-panel button.text-slate-500 { color: #94A3B8 !important; }
@@ -199,58 +200,58 @@ html.light aside.glass-panel button:hover.hover\:text-red-400 { color: #EF4444 !
 
 /* ── Background tokens inside panels ── */
 html.light .glass-panel .bg-white\/3,
-html.light .devpulse-panel .bg-white\/3 { background-color: #F8FAFC !important; }
+html.light .devpulse-panel .bg-white\/3 { background-color: #F5FAFF !important; }
 html.light .glass-panel .bg-white\/5,
-html.light .devpulse-panel .bg-white\/5 { background-color: #F8FAFC !important; }
+html.light .devpulse-panel .bg-white\/5 { background-color: #EBF3FF !important; }
 html.light .glass-panel .bg-white\/8,
-html.light .devpulse-panel .bg-white\/8 { background-color: #F1F5F9 !important; }
+html.light .devpulse-panel .bg-white\/8 { background-color: #EBF3FF !important; }
 html.light .glass-panel .bg-black\/20,
-html.light .devpulse-panel .bg-black\/20 { background-color: #F1F5F9 !important; }
+html.light .devpulse-panel .bg-black\/20 { background-color: #EBF3FF !important; }
 
-/* ── Dark bg tokens remapped to light equivalents ── */
+/* ── Dark bg tokens remapped to warm cream / light blue ── */
 html.light .glass-panel .bg-slate-800,
 html.light .devpulse-panel .bg-slate-800,
-html.light .glass .bg-slate-800 { background-color: #F8FAFC !important; }
+html.light .glass .bg-slate-800 { background-color: #EBF3FF !important; }
 
 html.light .glass-panel .bg-slate-900,
-html.light .devpulse-panel .bg-slate-900 { background-color: #F1F5F9 !important; }
+html.light .devpulse-panel .bg-slate-900 { background-color: #DBEAFE !important; }
 
 html.light .glass-panel .bg-\[\#111111\],
-html.light .devpulse-panel .bg-\[\#111111\] { background-color: #F8FAFC !important; }
+html.light .devpulse-panel .bg-\[\#111111\] { background-color: #EBF3FF !important; }
 html.light .glass-panel .bg-\[\#0a0a0a\],
-html.light .devpulse-panel .bg-\[\#0a0a0a\] { background-color: #F1F5F9 !important; }
+html.light .devpulse-panel .bg-\[\#0a0a0a\] { background-color: #EBF3FF !important; }
 html.light .glass-panel .bg-\[\#1a1a1a\],
-html.light .devpulse-panel .bg-\[\#1a1a1a\] { background-color: #F8FAFC !important; }
+html.light .devpulse-panel .bg-\[\#1a1a1a\] { background-color: #F5FAFF !important; }
 
 html.light .glass-panel .bg-slate-900\/50,
 html.light .glass-panel .bg-slate-900\/60,
 html.light .glass-panel .bg-slate-800\/40,
 html.light .glass-panel .bg-slate-800\/50,
-html.light .glass-panel .bg-slate-800\/60 { background-color: #F8FAFC !important; }
+html.light .glass-panel .bg-slate-800\/60 { background-color: #EBF3FF !important; }
 
 /* ── Border tokens ── */
 html.light .glass-panel .border-white\/5,
 html.light .devpulse-panel .border-white\/5,
-html.light .glass .border-white\/5 { border-color: #E2E8F0 !important; }
+html.light .glass .border-white\/5 { border-color: #D9E8FB !important; }
 html.light .glass-panel .border-white\/10,
 html.light .devpulse-panel .border-white\/10,
-html.light .glass .border-white\/10 { border-color: #E2E8F0 !important; }
+html.light .glass .border-white\/10 { border-color: #C7D7F0 !important; }
 html.light .glass-panel .border-\[\#222\],
 html.light .devpulse-panel .border-\[\#222\],
 html.light .glass-panel .border-\[\#222222\],
-html.light .devpulse-panel .border-\[\#222222\] { border-color: #E2E8F0 !important; }
+html.light .devpulse-panel .border-\[\#222222\] { border-color: #C7D7F0 !important; }
 html.light .glass-panel .border-\[\#2a2a2a\],
-html.light .devpulse-panel .border-\[\#2a2a2a\] { border-color: #E2E8F0 !important; }
+html.light .devpulse-panel .border-\[\#2a2a2a\] { border-color: #C7D7F0 !important; }
 html.light .glass-panel .border-slate-700,
-html.light .devpulse-panel .border-slate-700 { border-color: #E2E8F0 !important; }
+html.light .devpulse-panel .border-slate-700 { border-color: #C7D7F0 !important; }
 html.light .glass-panel .border-slate-800,
-html.light .devpulse-panel .border-slate-800 { border-color: #F1F5F9 !important; }
+html.light .devpulse-panel .border-slate-800 { border-color: #E0EDFF !important; }
 
 /* ── Hover states inside panels ── */
 html.light .glass-panel .hover\:bg-white\/5:hover,
-html.light .devpulse-panel .hover\:bg-white\/5:hover { background-color: #F8FAFC !important; }
+html.light .devpulse-panel .hover\:bg-white\/5:hover { background-color: #EBF3FF !important; }
 html.light .glass-panel .hover\:bg-\[\#1a1a1a\]:hover,
-html.light .devpulse-panel .hover\:bg-\[\#1a1a1a\]:hover { background-color: #EFF6FF !important; }
+html.light .devpulse-panel .hover\:bg-\[\#1a1a1a\]:hover { background-color: #DBEAFE !important; }
 
 /* ── Input / select / textarea ── */
 html.light input,
@@ -258,23 +259,23 @@ html.light select,
 html.light textarea {
   color: #0F172A !important;
   background-color: #FFFFFF !important;
-  border-color: #CBD5E1 !important;
+  border-color: #BFDBFE !important;
 }
 html.light input::placeholder,
-html.light textarea::placeholder { color: #94A3B8 !important; }
+html.light textarea::placeholder { color: #93C5FD !important; }
 
 html.light .glass-panel input,
 html.light .glass-panel select,
 html.light .glass-panel textarea {
-  background-color: #F8FAFC !important;
-  border-color: #CBD5E1 !important;
+  background-color: #F5FAFF !important;
+  border-color: #BFDBFE !important;
   color: #0F172A !important;
 }
 html.light .devpulse-panel input,
 html.light .devpulse-panel select,
 html.light .devpulse-panel textarea {
-  background-color: #F8FAFC !important;
-  border-color: #CBD5E1 !important;
+  background-color: #F5FAFF !important;
+  border-color: #BFDBFE !important;
   color: #0F172A !important;
 }
 
@@ -283,29 +284,29 @@ html.light .animate-slide-in-right,
 html.light .bg-slate-900 { background: #FFFFFF !important; }
 
 /* ── Segment control (QuickStatus, filter pills background) ── */
-html.light .bg-white\/3 { background-color: #F8FAFC !important; }
-html.light .border-white\/8 { border-color: #E2E8F0 !important; }
-html.light .divide-white\/8 > * + * { border-color: #E2E8F0 !important; }
+html.light .bg-white\/3 { background-color: #F5FAFF !important; }
+html.light .border-white\/8 { border-color: #C7D7F0 !important; }
+html.light .divide-white\/8 > * + * { border-color: #C7D7F0 !important; }
 
 /* ── Light mode input-base utility override ── */
 html.light .input-base {
-  background-color: #F8FAFC !important;
-  border-color: #CBD5E1 !important;
+  background-color: #F5FAFF !important;
+  border-color: #BFDBFE !important;
   color: #0F172A !important;
 }
 html.light .input-base:focus {
-  border-color: rgba(245,158,11,0.6) !important;
-  box-shadow: 0 0 0 3px rgba(245,158,11,0.12) !important;
+  border-color: #3B82F6 !important;
+  box-shadow: 0 0 0 3px rgba(59,130,246,0.15) !important;
 }
 
 /* ── Light mode thead/tbody ── */
 html.light .thead-row {
-  background-color: #F1F5F9 !important;
-  border-bottom-color: #E2E8F0 !important;
-  color: #64748B !important;
+  background-color: #EBF3FF !important;
+  border-bottom-color: #C7D7F0 !important;
+  color: #3B82F6 !important;
 }
-html.light .tbody-row { border-bottom-color: #F1F5F9 !important; }
-html.light .tbody-row:hover { background-color: #EFF6FF !important; }
+html.light .tbody-row { border-bottom-color: #E0EDFF !important; }
+html.light .tbody-row:hover { background-color: #DBEAFE !important; }
 
 /* ── Leaflet ── */
 .leaflet-pane { z-index: 1; }
