@@ -13,6 +13,7 @@ const analyticsRoutes = require('./analytics.routes');
 const portalRoutes = require('./portal.routes');
 const adminRoutes = require('./admin.routes');
 const documentRoutes = require('./documents.routes');
+const locationRoutes = require('./locations.routes');
 
 const router = Router();
 
@@ -27,5 +28,6 @@ router.use('/analytics', analyticsRoutes);
 router.use('/portal', portalRoutes);
 router.use('/admin', adminRoutes);
 router.use('/documents', documentRoutes);
+router.use('/locations', locationRoutes);
 
 module.exports = router;
