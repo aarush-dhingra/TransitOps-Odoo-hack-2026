@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, X, AlertTriangle, ArrowRight, Clock, Truck, User, Sparkles, FileDown } from 'lucide-react';
 import {
-  getTrips, createTrip, dispatchTrip, startTrip, completeTrip, cancelTrip,
+  getTrips, createTrip, updateTrip, dispatchTrip, startTrip, completeTrip, cancelTrip,
   getDispatchRecommendations, getTripSummary, downloadTripSummaryPdf,
 } from '../../api/trips';
 import { getVehicles } from '../../api/vehicles';
@@ -230,6 +230,18 @@ export default function TripsPage() {
       toast.error(err.response?.data?.error?.message ?? 'Failed to cancel trip.');
     } finally {
       setCancelTarget(null);
+    }
+  };
+
+  const handleAssignRecommendation = async (recommendation) => {
+    if (!insightTrip) return;
+    try {
+      await updateTrip(insightTrip.id, { vehicleId: recommendation.vehicle.id });
+      toast.success(`${recommendation.vehicle.registrationNumber} assigned to ${insightTrip.tripNumber}.`);
+      setInsightTrip(null);
+      fetchAll();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message ?? 'Failed to assign vehicle.');
     }
   };
 
@@ -688,18 +700,28 @@ export default function TripsPage() {
                 <EmptyState title="No suitable vehicles" message="No fleet vehicle matches this trip's cargo requirements." />
               ) : (
                 <div className="space-y-3">
+                  <p className="text-xs text-slate-500 mb-1">Click a vehicle to auto-assign it to this trip.</p>
                   {recommendations.slice(0, 5).map((recommendation, index) => (
-                    <div key={recommendation.vehicle.id} className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+                    <button
+                      key={recommendation.vehicle.id}
+                      onClick={() => handleAssignRecommendation(recommendation)}
+                      className="w-full text-left bg-slate-800 border border-slate-700 rounded-lg p-4 hover:border-amber-500/40 hover:bg-slate-700/60 transition-all group"
+                    >
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <p className="text-sm font-semibold text-slate-100">
+                          <p className="text-sm font-semibold text-slate-100 group-hover:text-amber-400 transition-colors">
                             {index + 1}. {recommendation.vehicle.registrationNumber}
                           </p>
                           <p className="text-xs text-slate-400 mt-0.5">
                             {recommendation.vehicle.make} {recommendation.vehicle.model} · {recommendation.vehicle.type}
                           </p>
                         </div>
-                        <span className="text-sm font-semibold text-amber-400">{recommendation.score}% match</span>
+                        <div className="flex flex-col items-end gap-1.5">
+                          <span className="text-sm font-semibold text-amber-400">{recommendation.score}% match</span>
+                          <span className="text-[10px] text-slate-600 group-hover:text-amber-400/70 transition-colors">
+                            Click to assign →
+                          </span>
+                        </div>
                       </div>
                       <div className="flex flex-wrap gap-1.5 mt-3">
                         {recommendation.reasons.map((reason) => (
@@ -708,7 +730,7 @@ export default function TripsPage() {
                           </span>
                         ))}
                       </div>
-                    </div>
+                    </button>
                   ))}
                 </div>
               )

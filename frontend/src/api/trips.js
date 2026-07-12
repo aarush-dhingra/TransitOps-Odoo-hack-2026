@@ -21,6 +21,9 @@ export const startTrip = (id) =>
 export const cancelTrip = (id) =>
   api.patch(`/trips/${id}/cancel`);
 
+export const updateTrip = (id, data) =>
+  api.put(`/trips/${id}`, data);
+
 export const getDispatchRecommendations = (params) =>
   api.get('/trips/recommendations', { params });
 
