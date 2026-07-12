@@ -10,7 +10,14 @@ const { success, paginated, error } = require('../utils/response');
 
 const createLogSchema = z.object({
   vehicleId: z.string().min(1),
-  type: z.enum(['OIL_CHANGE', 'TYRE_ROTATION', 'FULL_SERVICE', 'BRAKE_SERVICE', 'ENGINE_CHECK', 'OTHER']),
+  type: z.enum([
+    'OIL_CHANGE',
+    'TYRE_ROTATION',
+    'FULL_SERVICE',
+    'BRAKE_SERVICE',
+    'ENGINE_CHECK',
+    'OTHER',
+  ]),
   description: z.string().max(500).optional().nullable(),
   date: z.coerce.date(),
   cost: z.number().min(0).optional().nullable(),
@@ -21,7 +28,9 @@ const createLogSchema = z.object({
 });
 
 const updateLogSchema = z.object({
-  type: z.enum(['OIL_CHANGE', 'TYRE_ROTATION', 'FULL_SERVICE', 'BRAKE_SERVICE', 'ENGINE_CHECK', 'OTHER']).optional(),
+  type: z
+    .enum(['OIL_CHANGE', 'TYRE_ROTATION', 'FULL_SERVICE', 'BRAKE_SERVICE', 'ENGINE_CHECK', 'OTHER'])
+    .optional(),
   description: z.string().max(500).optional().nullable(),
   date: z.coerce.date().optional(),
   cost: z.number().min(0).optional().nullable(),
@@ -33,12 +42,18 @@ const updateLogSchema = z.object({
 
 const createScheduleSchema = z.object({
   vehicleId: z.string().min(1),
-  serviceType: z.enum(['OIL_CHANGE', 'TYRE_ROTATION', 'FULL_SERVICE', 'BRAKE_SERVICE', 'ENGINE_CHECK', 'OTHER']),
+  serviceType: z.enum([
+    'OIL_CHANGE',
+    'TYRE_ROTATION',
+    'FULL_SERVICE',
+    'BRAKE_SERVICE',
+    'ENGINE_CHECK',
+    'OTHER',
+  ]),
   intervalKm: z.number().positive(),
   lastOdometer: z.number().min(0),
   nextDueOdometer: z.number().min(0),
 });
-
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -55,9 +70,15 @@ async function listLogs(req, res, next) {
     const { page, limit, skip } = parsePagination(req.query);
 
     const where = {};
-    if (req.query.vehicleId) { where.vehicleId = req.query.vehicleId; }
-    if (req.query.status) { where.status = req.query.status; }
-    if (req.query.type) { where.type = req.query.type; }
+    if (req.query.vehicleId) {
+      where.vehicleId = req.query.vehicleId;
+    }
+    if (req.query.status) {
+      where.status = req.query.status;
+    }
+    if (req.query.type) {
+      where.type = req.query.type;
+    }
 
     const [items, total] = await prisma.$transaction([
       prisma.maintenanceLog.findMany({
@@ -226,7 +247,15 @@ async function listSchedulesByVehicle(req, res, next) {
       where: { vehicleId: req.params.vehicleId },
       orderBy: { createdAt: 'desc' },
       include: {
-        vehicle: { select: { id: true, registrationNumber: true, make: true, model: true, currentOdometer: true } },
+        vehicle: {
+          select: {
+            id: true,
+            registrationNumber: true,
+            make: true,
+            model: true,
+            currentOdometer: true,
+          },
+        },
       },
     });
 
@@ -258,7 +287,6 @@ async function createSchedule(req, res, next) {
     return next(err);
   }
 }
-
 
 module.exports = {
   listLogs,

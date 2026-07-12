@@ -26,7 +26,13 @@ router.get('/', verifyToken, requireRole(FM, SO, DISP), listDrivers);
 router.post('/', verifyToken, requireRole(SO, FM), validate(createDriverSchema), createDriver);
 router.get('/:id', verifyToken, requireRole(FM, SO, DISP), getDriver);
 router.put('/:id', verifyToken, requireRole(SO, FM), validate(updateDriverSchema), updateDriver);
-router.patch('/:id/status', verifyToken, requireRole(SO, FM), validate(patchDriverStatusSchema), patchDriverStatus);
+router.patch(
+  '/:id/status',
+  verifyToken,
+  requireRole(SO, FM),
+  validate(patchDriverStatusSchema),
+  patchDriverStatus
+);
 router.delete('/:id', verifyToken, requireRole(FM), deleteDriver);
 
 module.exports = router;
