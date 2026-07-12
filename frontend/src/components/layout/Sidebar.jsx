@@ -1,7 +1,7 @@
 import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, Truck, Users, Route, Wrench,
-  Fuel, BarChart2, Settings, LogOut,
+  Fuel, BarChart2, UserCog, LogOut,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { NAV_ITEMS, canRead } from '../../lib/permissions';
@@ -15,7 +15,7 @@ const ICONS = {
   '/maintenance': Wrench,
   '/fuel':        Fuel,
   '/analytics':   BarChart2,
-  '/settings':    Settings,
+  '/users':       UserCog,
 };
 
 const ROLE_LABELS = {

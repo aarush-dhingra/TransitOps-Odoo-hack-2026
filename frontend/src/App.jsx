@@ -13,6 +13,7 @@ import MaintenancePage from './pages/maintenance/MaintenancePage';
 import FuelPage from './pages/fuel/FuelPage';
 import AnalyticsPage from './pages/analytics/AnalyticsPage';
 import SettingsPage from './pages/settings/SettingsPage';
+import UserManagementPage from './pages/users/UserManagementPage';
 import DriverPortalPage from './pages/driver-portal/DriverPortalPage';
 
 export default function App() {
@@ -56,8 +57,13 @@ export default function App() {
             </ProtectedRoute>
           } />
           <Route path="/settings" element={
-            <ProtectedRoute resource="settings" redirect="/dashboard">
+            <ProtectedRoute allowedRoles={['ADMIN']} redirect="/dashboard">
               <SettingsPage />
+            </ProtectedRoute>
+          } />
+          <Route path="/users" element={
+            <ProtectedRoute resource="users" redirect="/dashboard">
+              <UserManagementPage />
             </ProtectedRoute>
           } />
         </Route>

@@ -237,16 +237,27 @@ export default function DashboardPage() {
                     <Pie
                       data={vehicleStatusData}
                       cx="50%" cy="50%"
-                      innerRadius={58} outerRadius={80}
-                      paddingAngle={3}
+                      innerRadius={58} outerRadius={82}
+                      paddingAngle={4}
                       dataKey="value"
                     >
                       {vehicleStatusData.map((entry, i) => (
-                        <Cell key={i} fill={entry.color} stroke="transparent" />
+                        <Cell key={i} fill={entry.color} stroke="#111111" strokeWidth={2} />
                       ))}
                     </Pie>
                     <Tooltip
-                      contentStyle={{ background: '#111', border: '1px solid #222', borderRadius: 8, fontSize: 12 }}
+                      contentStyle={{
+                        background: '#1e293b',
+                        border: '1px solid #334155',
+                        borderRadius: 8,
+                        fontSize: 12,
+                        boxShadow: '0 8px 24px rgba(0,0,0,0.6)',
+                        color: '#f1f5f9',
+                        padding: '6px 12px',
+                      }}
+                      itemStyle={{ color: '#f1f5f9', fontWeight: 600 }}
+                      labelStyle={{ color: '#94a3b8' }}
+                      cursor={false}
                     />
                     <DonutCenter cx="50%" cy="50%" pct={utilizationPct} />
                   </PieChart>

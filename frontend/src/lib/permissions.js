@@ -19,7 +19,7 @@ export const ALL_ERP_ROLES = [ROLES.ADMIN, ...ERP_ROLES];
 /** resource → { read: Role[], write: Role[] } */
 const ACCESS = {
   dashboard:  { read: ALL_ERP_ROLES, write: [] },
-  settings:   { read: ALL_ERP_ROLES, write: ALL_ERP_ROLES },
+  users:      { read: [ROLES.ADMIN], write: [ROLES.ADMIN] },
   fleet:      { read: [ROLES.FLEET_MANAGER, ROLES.DISPATCHER], write: [ROLES.FLEET_MANAGER] },
   drivers:    { read: [ROLES.FLEET_MANAGER, ROLES.SAFETY_OFFICER], write: [ROLES.FLEET_MANAGER, ROLES.SAFETY_OFFICER] },
   trips:      { read: [ROLES.FLEET_MANAGER, ROLES.DISPATCHER, ROLES.SAFETY_OFFICER], write: [ROLES.FLEET_MANAGER, ROLES.DISPATCHER] },
@@ -52,5 +52,5 @@ export const NAV_ITEMS = [
   { path: '/maintenance', label: 'Maintenance',     resource: 'maintenance' },
   { path: '/fuel',        label: 'Fuel & Expenses', resource: 'fuel' },
   { path: '/analytics',   label: 'Analytics',       resource: 'analytics' },
-  { path: '/settings',    label: 'Settings',        resource: 'settings' },
+  { path: '/users',       label: 'User Management', resource: 'users' },
 ];
