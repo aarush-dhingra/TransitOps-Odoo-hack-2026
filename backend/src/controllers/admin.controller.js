@@ -167,9 +167,43 @@ async function deleteUser(req, res, next) {
   }
 }
 
+async function unlockUser(req, res, next) {
+  try {
+    const { id } = req.params;
+
+    const user = await prisma.user.findUnique({ where: { id } });
+    if (!user) {
+      return error(res, 'NOT_FOUND', 'User not found.', 404);
+    }
+
+    if (!user.lockedUntil && user.failedLoginAttempts === 0) {
+      return error(res, 'CONFLICT', 'User account is not locked.', 409);
+    }
+
+    const updated = await prisma.user.update({
+      where: { id },
+      data: { failedLoginAttempts: 0, lockedUntil: null },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        failedLoginAttempts: true,
+        lockedUntil: true,
+        updatedAt: true,
+      },
+    });
+
+    return success(res, updated);
+  } catch (err) {
+    return next(err);
+  }
+}
+
 module.exports = {
   createUser,
   getUsers,
   updateUser,
   deleteUser,
+  unlockUser,
 };
