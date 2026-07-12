@@ -579,14 +579,14 @@ export default function TripsPage() {
                     min={todayStr}
                     value={form.departureDate}
                     onChange={(e) => setForm((f) => ({ ...f, departureDate: e.target.value }))}
-                    className={cn(inputCls, 'flex-1')}
+                    className={cn(inputCls, 'flex-1 pr-2')}
                   />
                   <input
                     type="time"
                     required
                     value={form.departureTime}
                     onChange={(e) => setForm((f) => ({ ...f, departureTime: e.target.value }))}
-                    className={cn(inputCls, 'w-28 shrink-0')}
+                    className={cn(inputCls, 'w-28 shrink-0 pr-2')}
                   />
                 </div>
               </div>
