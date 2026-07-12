@@ -9,9 +9,15 @@ async function getDashboard(req, res, next) {
   try {
     // Optional vehicle filters for KPIs
     const vehicleWhere = {};
-    if (req.query.region) vehicleWhere.region = req.query.region;
-    if (req.query.vehicleType) vehicleWhere.type = req.query.vehicleType;
-    if (req.query.vehicleStatus) vehicleWhere.status = req.query.vehicleStatus;
+    if (req.query.region) {
+      vehicleWhere.region = req.query.region;
+    }
+    if (req.query.vehicleType) {
+      vehicleWhere.type = req.query.vehicleType;
+    }
+    if (req.query.vehicleStatus) {
+      vehicleWhere.status = req.query.vehicleStatus;
+    }
 
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -62,8 +68,7 @@ async function getDashboard(req, res, next) {
       WHERE v.current_odometer >= s.next_due_odometer
     `;
 
-    const driversOnDuty =
-      driverStatusGroups.find((g) => g.status === 'ON_TRIP')?._count.id || 0;
+    const driversOnDuty = driverStatusGroups.find((g) => g.status === 'ON_TRIP')?._count.id || 0;
 
     const fleetUtilizationPct =
       totalNonRetiredVehicles > 0
@@ -262,39 +267,48 @@ async function getFuelEfficiency(req, res, next) {
 
 async function getCosts(req, res, next) {
   try {
-    const [expenseByCategory, fuelByMonth, expenseByMonth, totalFuel, totalExpense] =
-      await Promise.all([
-        prisma.expense.groupBy({
-          by: ['category'],
-          _sum: { amount: true },
-          orderBy: { _sum: { amount: 'desc' } },
-        }),
-        prisma.$queryRaw`
+    const [
+      expenseByCategory,
+      fuelByMonth,
+      expenseByMonth,
+      totalFuel,
+      totalExpense,
+      totalMaintenance,
+    ] = await Promise.all([
+      prisma.expense.groupBy({
+        by: ['category'],
+        _sum: { amount: true },
+        orderBy: { _sum: { amount: 'desc' } },
+      }),
+      prisma.$queryRaw`
         SELECT TO_CHAR(date, 'YYYY-MM') AS month, COALESCE(SUM(total_cost), 0)::float AS fuel_cost
         FROM fuel_logs
         GROUP BY TO_CHAR(date, 'YYYY-MM')
         ORDER BY month DESC
         LIMIT 12
       `,
-        prisma.$queryRaw`
+      prisma.$queryRaw`
         SELECT TO_CHAR(date, 'YYYY-MM') AS month, COALESCE(SUM(amount), 0)::float AS expense_cost
         FROM expenses
         GROUP BY TO_CHAR(date, 'YYYY-MM')
         ORDER BY month DESC
         LIMIT 12
       `,
-        prisma.fuelLog.aggregate({ _sum: { totalCost: true } }),
-        prisma.expense.aggregate({ _sum: { amount: true } }),
-      ]);
+      prisma.fuelLog.aggregate({ _sum: { totalCost: true } }),
+      prisma.expense.aggregate({ _sum: { amount: true } }),
+      prisma.maintenanceLog.aggregate({ _sum: { cost: true } }),
+    ]);
 
     const totalFuelCost = totalFuel._sum.totalCost || 0;
     const totalExpenseCost = totalExpense._sum.amount || 0;
+    const totalMaintenanceCost = totalMaintenance._sum.cost || 0;
 
     return success(res, {
       summary: {
         totalFuelCost,
         totalExpenseCost,
-        totalCost: totalFuelCost + totalExpenseCost,
+        totalMaintenanceCost,
+        totalCost: totalFuelCost + totalExpenseCost + totalMaintenanceCost,
       },
       expenseByCategory: expenseByCategory.map((g) => ({
         category: g.category,
@@ -308,4 +322,49 @@ async function getCosts(req, res, next) {
   }
 }
 
-module.exports = { getDashboard, getAlerts, getUtilization, getFuelEfficiency, getCosts };
+async function getVehicleCosts(req, res, next) {
+  try {
+    const rows = await prisma.$queryRaw`
+      SELECT
+        v.id,
+        v.registration_number,
+        v.make,
+        v.model,
+        v.acquisition_cost,
+        COALESCE(SUM(f.total_cost), 0)::float   AS fuel_cost,
+        COALESCE(SUM(e.amount), 0)::float        AS expense_cost,
+        COALESCE(SUM(m.cost), 0)::float          AS maintenance_cost,
+        COALESCE(SUM(f.total_cost), 0) +
+          COALESCE(SUM(e.amount), 0) +
+          COALESCE(SUM(m.cost), 0)              AS total_cost,
+        COALESCE(SUM(t.revenue), 0)::float       AS total_revenue
+      FROM vehicles v
+      LEFT JOIN fuel_logs     f ON f.vehicle_id = v.id
+      LEFT JOIN expenses      e ON e.vehicle_id = v.id
+      LEFT JOIN maintenance_logs m ON m.vehicle_id = v.id
+      LEFT JOIN trips         t ON t.vehicle_id = v.id AND t.status = 'COMPLETED'
+      WHERE v.status != 'RETIRED'
+      GROUP BY v.id, v.registration_number, v.make, v.model, v.acquisition_cost
+      ORDER BY total_cost DESC
+    `;
+    const data = rows.map((r) => ({
+      ...r,
+      roi:
+        r.acquisition_cost && r.acquisition_cost > 0
+          ? Math.round(((r.total_revenue - r.total_cost) / r.acquisition_cost) * 100 * 100) / 100
+          : null,
+    }));
+    return success(res, data);
+  } catch (err) {
+    return next(err);
+  }
+}
+
+module.exports = {
+  getDashboard,
+  getAlerts,
+  getUtilization,
+  getFuelEfficiency,
+  getCosts,
+  getVehicleCosts,
+};

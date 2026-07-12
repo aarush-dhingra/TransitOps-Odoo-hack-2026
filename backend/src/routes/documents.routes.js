@@ -10,7 +10,6 @@ const {
   serveFile,
   deleteDocument,
 } = require('../controllers/documents.controller');
-const { error } = require('../utils/response');
 
 const router = Router();
 
@@ -18,7 +17,9 @@ const ERP = ['FLEET_MANAGER', 'DISPATCHER', 'SAFETY_OFFICER', 'FINANCIAL_ANALYST
 
 function handleMulter(req, res, next) {
   upload.single('file')(req, res, (err) => {
-    if (!err) return next();
+    if (!err) {
+      return next();
+    }
     if (err.code === 'LIMIT_FILE_SIZE') {
       return res.status(413).json({
         success: false,

@@ -10,6 +10,7 @@ const {
   createTrip,
   updateTrip,
   dispatchTrip,
+  startTrip,
   completeTrip,
   cancelTrip,
   createTripSchema,
@@ -33,6 +34,7 @@ router.patch(
   validate(dispatchTripSchema),
   dispatchTrip
 );
+router.patch('/:id/start', verifyToken, requireRole(DISP, FM), startTrip);
 router.patch('/:id/complete', verifyToken, requireRole(DISP, FM), completeTrip);
 router.patch('/:id/cancel', verifyToken, requireRole(DISP, FM), cancelTrip);
 

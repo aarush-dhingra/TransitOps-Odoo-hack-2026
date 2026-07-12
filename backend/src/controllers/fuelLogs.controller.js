@@ -24,8 +24,17 @@ async function getFuelLogs(req, res, next) {
     const limit = Math.max(1, Math.min(100, parseInt(req.query.limit, 10) || 10));
     const skip = (page - 1) * limit;
 
+    const where = {};
+    if (req.query.vehicleId) {
+      where.vehicleId = req.query.vehicleId;
+    }
+    if (req.query.tripId) {
+      where.tripId = req.query.tripId;
+    }
+
     const [items, total] = await Promise.all([
       prisma.fuelLog.findMany({
+        where,
         skip,
         take: limit,
         orderBy: { date: 'desc' },
@@ -34,7 +43,7 @@ async function getFuelLogs(req, res, next) {
           trip: true,
         },
       }),
-      prisma.fuelLog.count(),
+      prisma.fuelLog.count({ where }),
     ]);
 
     return paginated(res, items, { page, limit, total });

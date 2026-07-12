@@ -74,6 +74,11 @@ async function assertDriverAvailable(driverId) {
   if (driver.status === 'ON_TRIP') {
     return { err: 'DRIVER_NOT_AVAILABLE:Driver is already on a trip.' };
   }
+  if (driver.status === 'OFF_DUTY' || driver.status === 'ON_LEAVE') {
+    return {
+      err: `DRIVER_NOT_AVAILABLE:Driver is ${driver.status.replace('_', ' ').toLowerCase()} and cannot be assigned to a trip.`,
+    };
+  }
   if (driver.licenseExpiry < new Date()) {
     return { err: 'DRIVER_LICENSE_EXPIRED:Driver has an expired license.' };
   }
@@ -396,12 +401,33 @@ async function cancelTrip(req, res, next) {
   }
 }
 
+async function startTrip(req, res, next) {
+  try {
+    const trip = await prisma.trip.findUnique({ where: { id: req.params.id } });
+    if (!trip) {
+      return error(res, 'NOT_FOUND', 'Trip not found.', 404);
+    }
+    if (trip.status !== 'DISPATCHED') {
+      return error(res, 'INVALID_TRANSITION', 'Only DISPATCHED trips can be started.', 400);
+    }
+    const updated = await prisma.trip.update({
+      where: { id: req.params.id },
+      data: { status: 'ACTIVE', actualDeparture: new Date() },
+      include: { vehicle: true, driver: true },
+    });
+    return success(res, updated);
+  } catch (err) {
+    return next(err);
+  }
+}
+
 module.exports = {
   getTrips,
   getTripById,
   createTrip,
   updateTrip,
   dispatchTrip,
+  startTrip,
   completeTrip,
   cancelTrip,
   createTripSchema,

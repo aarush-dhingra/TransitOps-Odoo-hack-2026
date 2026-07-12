@@ -36,7 +36,10 @@ async function uploadDocument(req, res, next) {
     const parsed = uploadSchema.safeParse(req.body);
     if (!parsed.success) {
       cleanupFile(req.file.path);
-      const issues = parsed.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }));
+      const issues = parsed.error.issues.map((i) => ({
+        field: i.path.join('.'),
+        message: i.message,
+      }));
       return res.status(422).json({
         success: false,
         data: null,
@@ -48,15 +51,24 @@ async function uploadDocument(req, res, next) {
 
     if (vehicleId) {
       const v = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
-      if (!v) { cleanupFile(req.file.path); return error(res, 'NOT_FOUND', 'Vehicle not found.', 404); }
+      if (!v) {
+        cleanupFile(req.file.path);
+        return error(res, 'NOT_FOUND', 'Vehicle not found.', 404);
+      }
     }
     if (driverId) {
       const d = await prisma.driver.findUnique({ where: { id: driverId } });
-      if (!d) { cleanupFile(req.file.path); return error(res, 'NOT_FOUND', 'Driver not found.', 404); }
+      if (!d) {
+        cleanupFile(req.file.path);
+        return error(res, 'NOT_FOUND', 'Driver not found.', 404);
+      }
     }
     if (maintenanceLogId) {
       const m = await prisma.maintenanceLog.findUnique({ where: { id: maintenanceLogId } });
-      if (!m) { cleanupFile(req.file.path); return error(res, 'NOT_FOUND', 'Maintenance log not found.', 404); }
+      if (!m) {
+        cleanupFile(req.file.path);
+        return error(res, 'NOT_FOUND', 'Maintenance log not found.', 404);
+      }
     }
 
     const doc = await prisma.document.create({
@@ -80,7 +92,9 @@ async function uploadDocument(req, res, next) {
 
     return success(res, doc, 201);
   } catch (err) {
-    if (req.file) cleanupFile(req.file.path);
+    if (req.file) {
+      cleanupFile(req.file.path);
+    }
     return next(err);
   }
 }
@@ -92,10 +106,18 @@ async function listDocuments(req, res, next) {
     const skip = (page - 1) * limit;
 
     const where = {};
-    if (req.query.vehicleId) where.vehicleId = req.query.vehicleId;
-    if (req.query.driverId) where.driverId = req.query.driverId;
-    if (req.query.maintenanceLogId) where.maintenanceLogId = req.query.maintenanceLogId;
-    if (req.query.category) where.category = req.query.category;
+    if (req.query.vehicleId) {
+      where.vehicleId = req.query.vehicleId;
+    }
+    if (req.query.driverId) {
+      where.driverId = req.query.driverId;
+    }
+    if (req.query.maintenanceLogId) {
+      where.maintenanceLogId = req.query.maintenanceLogId;
+    }
+    if (req.query.category) {
+      where.category = req.query.category;
+    }
 
     const [items, total] = await Promise.all([
       prisma.document.findMany({

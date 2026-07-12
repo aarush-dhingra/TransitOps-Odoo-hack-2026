@@ -9,6 +9,7 @@ const {
   getUtilization,
   getFuelEfficiency,
   getCosts,
+  getVehicleCosts,
 } = require('../controllers/analytics.controller');
 
 const router = Router();
@@ -23,5 +24,6 @@ router.get('/alerts', verifyToken, requireRole(FM, SO), getAlerts);
 router.get('/utilization', verifyToken, requireRole(FM), getUtilization);
 router.get('/fuel-efficiency', verifyToken, requireRole(FM, FA), getFuelEfficiency);
 router.get('/costs', verifyToken, requireRole(FM, FA), getCosts);
+router.get('/vehicle-costs', verifyToken, requireRole(FM, FA), getVehicleCosts);
 
 module.exports = router;

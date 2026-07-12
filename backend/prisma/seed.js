@@ -306,8 +306,12 @@ async function main() {
 
   // ─── Helper to create dates in the past ──────────────────────────────────────
 
-  function daysAgo(n) { return new Date(Date.now() - n * 24 * 60 * 60 * 1000); }
-  function hoursAgo(n) { return new Date(Date.now() - n * 60 * 60 * 1000); }
+  function daysAgo(n) {
+    return new Date(Date.now() - n * 24 * 60 * 60 * 1000);
+  }
+  function hoursAgo(n) {
+    return new Date(Date.now() - n * 60 * 60 * 1000);
+  }
 
   // ─── Completed trips (for analytics data) ────────────────────────────────────
 
@@ -347,7 +351,7 @@ async function main() {
       originLat: 18.5204,
       originLng: 73.8567,
       destinationAddress: 'Hadapsar Industrial Estate, Pune',
-      destinationLat: 18.5020,
+      destinationLat: 18.502,
       destinationLng: 73.9284,
       distanceKm: 11.2,
       cargoWeight: 800,
