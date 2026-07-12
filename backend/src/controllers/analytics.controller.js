@@ -324,29 +324,50 @@ async function getCosts(req, res, next) {
 
 async function getVehicleCosts(req, res, next) {
   try {
+    // Each cost source is pre-aggregated in its own subquery to prevent
+    // Cartesian product multiplication from multiple simultaneous LEFT JOINs.
     const rows = await prisma.$queryRaw`
       SELECT
         v.id,
         v.registration_number,
         v.make,
         v.model,
+        v.type,
+        v.status,
         v.acquisition_cost,
-        COALESCE(SUM(f.total_cost), 0)::float   AS fuel_cost,
-        COALESCE(SUM(e.amount), 0)::float        AS expense_cost,
-        COALESCE(SUM(m.cost), 0)::float          AS maintenance_cost,
-        COALESCE(SUM(f.total_cost), 0) +
-          COALESCE(SUM(e.amount), 0) +
-          COALESCE(SUM(m.cost), 0)              AS total_cost,
-        COALESCE(SUM(t.revenue), 0)::float       AS total_revenue
+        COALESCE(f.fuel_cost, 0)::float           AS fuel_cost,
+        COALESCE(e.expense_cost, 0)::float         AS expense_cost,
+        COALESCE(m.maintenance_cost, 0)::float     AS maintenance_cost,
+        (COALESCE(f.fuel_cost, 0) +
+         COALESCE(e.expense_cost, 0) +
+         COALESCE(m.maintenance_cost, 0))::float   AS total_cost,
+        COALESCE(t.total_revenue, 0)::float        AS total_revenue
       FROM vehicles v
-      LEFT JOIN fuel_logs     f ON f.vehicle_id = v.id
-      LEFT JOIN expenses      e ON e.vehicle_id = v.id
-      LEFT JOIN maintenance_logs m ON m.vehicle_id = v.id
-      LEFT JOIN trips         t ON t.vehicle_id = v.id AND t.status = 'COMPLETED'
+      LEFT JOIN (
+        SELECT vehicle_id, SUM(total_cost) AS fuel_cost
+        FROM fuel_logs
+        GROUP BY vehicle_id
+      ) f ON f.vehicle_id = v.id
+      LEFT JOIN (
+        SELECT vehicle_id, SUM(amount) AS expense_cost
+        FROM expenses
+        GROUP BY vehicle_id
+      ) e ON e.vehicle_id = v.id
+      LEFT JOIN (
+        SELECT vehicle_id, SUM(cost) AS maintenance_cost
+        FROM maintenance_logs
+        GROUP BY vehicle_id
+      ) m ON m.vehicle_id = v.id
+      LEFT JOIN (
+        SELECT vehicle_id, SUM(revenue) AS total_revenue
+        FROM trips
+        WHERE status = 'COMPLETED'
+        GROUP BY vehicle_id
+      ) t ON t.vehicle_id = v.id
       WHERE v.status != 'RETIRED'
-      GROUP BY v.id, v.registration_number, v.make, v.model, v.acquisition_cost
       ORDER BY total_cost DESC
     `;
+
     const data = rows.map((r) => ({
       ...r,
       roi:
@@ -354,6 +375,7 @@ async function getVehicleCosts(req, res, next) {
           ? Math.round(((r.total_revenue - r.total_cost) / r.acquisition_cost) * 100 * 100) / 100
           : null,
     }));
+
     return success(res, data);
   } catch (err) {
     return next(err);
