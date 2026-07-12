@@ -87,6 +87,7 @@ enum DocumentCategory {
   VEHICLE_REGISTRY
   INSURANCE_CERTIFICATE
   PUC_CERTIFICATE
+  FITNESS_CERTIFICATE
   MAINTENANCE_INVOICE
   FUEL_RECEIPT
   OTHER
@@ -322,6 +323,7 @@ model Document {
   mimeType     String           @map("mime_type")
   sizeBytes    Int              @map("size_bytes")
   category     DocumentCategory
+  expiryDate   DateTime?        @map("expiry_date")
 
   vehicleId        String?         @map("vehicle_id")
   vehicle          Vehicle?        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)

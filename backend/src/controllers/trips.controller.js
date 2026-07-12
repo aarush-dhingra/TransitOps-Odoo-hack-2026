@@ -421,6 +421,254 @@ async function startTrip(req, res, next) {
   }
 }
 
+async function getDispatchRecommendations(req, res, next) {
+  try {
+    const cargoWeight = Number(req.query.cargoWeight);
+    if (!Number.isFinite(cargoWeight) || cargoWeight <= 0) {
+      return error(res, 'VALIDATION_ERROR', 'Cargo weight must be a positive number.', 422);
+    }
+
+    const [vehicles, schedules, fuelLogs, maintenanceLogs] = await Promise.all([
+      prisma.vehicle.findMany({
+        where: { status: 'AVAILABLE' },
+      }),
+      prisma.maintenanceSchedule.findMany(),
+      prisma.fuelLog.findMany(),
+      prisma.maintenanceLog.findMany(),
+    ]);
+
+    const recommendations = [];
+
+    for (const v of vehicles) {
+      if (v.maximumLoadCapacity !== null && v.maximumLoadCapacity < cargoWeight) {
+        continue;
+      }
+
+      const availabilityScore = 100;
+
+      let defaultConsumption = 10;
+      if (v.type === 'VAN') {
+        defaultConsumption = 10;
+      } else if (v.type === 'CAR') {
+        defaultConsumption = 7;
+      } else if (v.type === 'BIKE') {
+        defaultConsumption = 3;
+      } else if (v.type === 'TRUCK') {
+        defaultConsumption = 25;
+      } else if (v.type === 'BUS') {
+        defaultConsumption = 28;
+      }
+
+      const vFuelLogs = fuelLogs.filter((f) => f.vehicleId === v.id);
+      let fuelScore = 50;
+      if (vFuelLogs.length > 0) {
+        const avgLitres = vFuelLogs.reduce((acc, f) => acc + f.litres, 0) / vFuelLogs.length;
+        fuelScore = Math.max(0, 100 - avgLitres * 2);
+      } else {
+        fuelScore = Math.max(0, 100 - defaultConsumption * 2.5);
+      }
+
+      let safetyScore = 100;
+      const vSchedules = schedules.filter((s) => s.vehicleId === v.id);
+      for (const s of vSchedules) {
+        if (v.currentOdometer >= s.nextDueOdometer) {
+          safetyScore -= 20;
+        }
+      }
+      safetyScore = Math.max(0, safetyScore);
+
+      const vMaintenances = maintenanceLogs.filter((m) => m.vehicleId === v.id);
+      const totalMaintCost = vMaintenances.reduce((acc, m) => acc + (m.cost || 0), 0);
+      const maintenanceScore = Math.max(0, 100 - totalMaintCost / 500);
+
+      const totalScore =
+        Math.round(
+          (fuelScore * 0.4 + availabilityScore * 0.3 + safetyScore * 0.2 + maintenanceScore * 0.1) *
+            100
+        ) / 100;
+
+      const reasons = [];
+      reasons.push('Available');
+      if (
+        cargoWeight > 0 &&
+        v.maximumLoadCapacity !== null &&
+        v.maximumLoadCapacity >= cargoWeight
+      ) {
+        const capacityUtilization = cargoWeight / v.maximumLoadCapacity;
+        if (capacityUtilization >= 0.7) {
+          reasons.push('Closest capacity');
+        }
+      }
+      if (maintenanceScore >= 80) {
+        reasons.push('Lowest maintenance cost');
+      }
+      if (fuelScore >= 75) {
+        reasons.push('Highest fuel efficiency');
+      }
+
+      recommendations.push({
+        vehicle: {
+          id: v.id,
+          registrationNumber: v.registrationNumber,
+          make: v.make,
+          model: v.model,
+          type: v.type,
+          maximumLoadCapacity: v.maximumLoadCapacity,
+        },
+        score: totalScore,
+        reasons,
+        breakdown: {
+          fuelEfficiency: fuelScore,
+          availability: availabilityScore,
+          safety: safetyScore,
+          maintenance: maintenanceScore,
+        },
+      });
+    }
+
+    recommendations.sort((a, b) => b.score - a.score);
+
+    return success(res, recommendations);
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function getTripSummary(req, res, next) {
+  try {
+    const trip = await prisma.trip.findUnique({
+      where: { id: req.params.id },
+      include: {
+        vehicle: true,
+        driver: true,
+        fuelLogs: true,
+        expenses: true,
+      },
+    });
+
+    if (!trip) {
+      return error(res, 'NOT_FOUND', 'Trip not found.', 404);
+    }
+
+    const totalFuelUsed = trip.fuelLogs.reduce((acc, f) => acc + f.litres, 0);
+    const totalFuelCost = trip.fuelLogs.reduce((acc, f) => acc + f.totalCost, 0);
+    const totalExpenses = trip.expenses.reduce((acc, e) => acc + e.amount, 0);
+    const totalCost = totalFuelCost + totalExpenses;
+    const revenue = trip.revenue || 0;
+    const profit = revenue - totalCost;
+
+    return success(res, {
+      tripNumber: trip.tripNumber,
+      originAddress: trip.originAddress,
+      destinationAddress: trip.destinationAddress,
+      distanceKm: trip.distanceKm || 0,
+      status: trip.status,
+      plannedDeparture: trip.plannedDeparture,
+      plannedArrival: trip.plannedArrival,
+      actualDeparture: trip.actualDeparture,
+      actualArrival: trip.actualArrival,
+      vehicle: trip.vehicle
+        ? {
+            id: trip.vehicle.id,
+            registrationNumber: trip.vehicle.registrationNumber,
+            make: trip.vehicle.make,
+            model: trip.vehicle.model,
+          }
+        : null,
+      driver: trip.driver
+        ? {
+            id: trip.driver.id,
+            name: trip.driver.name,
+          }
+        : null,
+      metrics: {
+        distance: trip.distanceKm || 0,
+        fuelUsed: totalFuelUsed,
+        fuelCost: totalFuelCost,
+        expensesCost: totalExpenses,
+        totalCost,
+        revenue,
+        profit,
+      },
+    });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function getTripSummaryPdf(req, res, next) {
+  try {
+    const trip = await prisma.trip.findUnique({
+      where: { id: req.params.id },
+      include: {
+        vehicle: true,
+        driver: true,
+        fuelLogs: true,
+        expenses: true,
+      },
+    });
+
+    if (!trip) {
+      return error(res, 'NOT_FOUND', 'Trip not found.', 404);
+    }
+
+    const totalFuelUsed = trip.fuelLogs.reduce((acc, f) => acc + f.litres, 0);
+    const totalFuelCost = trip.fuelLogs.reduce((acc, f) => acc + f.totalCost, 0);
+    const totalExpenses = trip.expenses.reduce((acc, e) => acc + e.amount, 0);
+    const totalCost = totalFuelCost + totalExpenses;
+    const revenue = trip.revenue || 0;
+    const profit = revenue - totalCost;
+
+    const PDFDocument = require('pdfkit');
+    const doc = new PDFDocument({ margin: 50 });
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader(
+      'Content-Disposition',
+      `attachment; filename="trip-${trip.tripNumber}-summary.pdf"`
+    );
+
+    doc.pipe(res);
+
+    doc.fontSize(24).text('TransitOps Trip Summary', { align: 'center' });
+    doc.moveDown();
+
+    doc.fontSize(16).text(`Trip Details: ${trip.tripNumber}`);
+    doc.fontSize(12).text(`Route: ${trip.originAddress} -> ${trip.destinationAddress}`);
+    doc.text(`Status: ${trip.status}`);
+    doc.text(`Planned Departure: ${trip.plannedDeparture.toLocaleString()}`);
+    if (trip.actualDeparture) {
+      doc.text(`Actual Departure: ${trip.actualDeparture.toLocaleString()}`);
+    }
+    if (trip.actualArrival) {
+      doc.text(`Actual Arrival: ${trip.actualArrival.toLocaleString()}`);
+    }
+    doc.moveDown();
+
+    doc.fontSize(16).text('Resources');
+    doc
+      .fontSize(12)
+      .text(
+        `Vehicle: ${trip.vehicle ? `${trip.vehicle.make} ${trip.vehicle.model} (${trip.vehicle.registrationNumber})` : 'N/A'}`
+      );
+    doc.text(`Driver: ${trip.driver ? trip.driver.name : 'N/A'}`);
+    doc.moveDown();
+
+    doc.fontSize(16).text('Metrics');
+    doc.fontSize(12).text(`Distance: ${trip.distanceKm || 0} km`);
+    doc.text(`Fuel Used: ${totalFuelUsed.toFixed(2)} L`);
+    doc.text(`Fuel Cost: ${totalFuelCost.toFixed(2)} INR`);
+    doc.text(`Expenses: ${totalExpenses.toFixed(2)} INR`);
+    doc.text(`Total Cost: ${totalCost.toFixed(2)} INR`);
+    doc.text(`Total Revenue: ${revenue.toFixed(2)} INR`);
+    doc.text(`Net Profit: ${profit.toFixed(2)} INR`);
+
+    doc.end();
+  } catch (err) {
+    return next(err);
+  }
+}
+
 module.exports = {
   getTrips,
   getTripById,
@@ -428,6 +676,9 @@ module.exports = {
   updateTrip,
   dispatchTrip,
   startTrip,
+  getDispatchRecommendations,
+  getTripSummary,
+  getTripSummaryPdf,
   completeTrip,
   cancelTrip,
   createTripSchema,

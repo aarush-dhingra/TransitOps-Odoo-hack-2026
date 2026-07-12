@@ -1,6 +1,15 @@
-import { useEffect, useState, useCallback } from 'react';
-import { Plus, X, AlertTriangle, ArrowRight } from 'lucide-react';
-import { getTrips, createTrip, dispatchTrip, completeTrip, cancelTrip } from '../../api/trips';
+import { useCallback, useEffect, useState } from 'react';
+import { AlertTriangle, ArrowRight, FileDown, Plus, Sparkles, X } from 'lucide-react';
+import {
+  cancelTrip,
+  completeTrip,
+  createTrip,
+  dispatchTrip,
+  downloadTripSummaryPdf,
+  getDispatchRecommendations,
+  getTrips,
+  getTripSummary,
+} from '../../api/trips';
 import { getVehicles } from '../../api/vehicles';
 import { getDrivers } from '../../api/drivers';
 import StatusBadge from '../../components/shared/StatusBadge';
@@ -41,6 +50,11 @@ export default function TripsPage() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [form,       setForm]       = useState(EMPTY_FORM);
   const [saving,     setSaving]     = useState(false);
+  const [insightTrip, setInsightTrip] = useState(null);
+  const [insightType, setInsightType] = useState('');
+  const [insightLoading, setInsightLoading] = useState(false);
+  const [recommendations, setRecommendations] = useState([]);
+  const [summary, setSummary] = useState(null);
 
   // Format current datetime for datetime-local min attribute
   const now = new Date();
@@ -141,6 +155,53 @@ export default function TripsPage() {
     }
   };
 
+  const openRecommendations = async (trip) => {
+    const cargoWeight = Number(trip.cargoWeight);
+    if (!cargoWeight) {
+      toast.error('Add a cargo weight before requesting recommendations.');
+      return;
+    }
+    setInsightTrip(trip);
+    setInsightType('recommendations');
+    setRecommendations([]);
+    setInsightLoading(true);
+    try {
+      const response = await getDispatchRecommendations({ cargoWeight });
+      setRecommendations(response.data.data ?? []);
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message ?? 'Failed to load recommendations.');
+      setInsightTrip(null);
+    } finally {
+      setInsightLoading(false);
+    }
+  };
+
+  const openSummary = async (trip) => {
+    setInsightTrip(trip);
+    setInsightType('summary');
+    setSummary(null);
+    setInsightLoading(true);
+    try {
+      const response = await getTripSummary(trip.id);
+      setSummary(response.data.data);
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message ?? 'Failed to load trip summary.');
+      setInsightTrip(null);
+    } finally {
+      setInsightLoading(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (!insightTrip || !summary) return;
+    try {
+      await downloadTripSummaryPdf(insightTrip.id, summary.tripNumber);
+      toast.success('PDF download started.');
+    } catch {
+      toast.error('Failed to generate PDF summary.');
+    }
+  };
+
   return (
     <div className="space-y-5">
       <PageHeader
@@ -202,8 +263,21 @@ export default function TripsPage() {
                         <p className="text-xs text-slate-600 mt-0.5">{formatDateTime(t.plannedDeparture)}</p>
                       </div>
 
-                      {canEditTrips && (
-                        <div className="flex flex-col gap-1.5 shrink-0">
+                      <div className="flex flex-col gap-1.5 shrink-0">
+                        {t.status === 'DRAFT' && (
+                          <button onClick={() => openRecommendations(t)}
+                            className="flex items-center justify-center gap-1 px-3 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/30 rounded text-xs font-medium hover:bg-amber-500/20 transition-colors">
+                            <Sparkles className="w-3 h-3" /> Recommend
+                          </button>
+                        )}
+                        {t.status === 'COMPLETED' && (
+                          <button onClick={() => openSummary(t)}
+                            className="flex items-center justify-center gap-1 px-3 py-1 bg-violet-500/10 text-violet-400 border border-violet-500/30 rounded text-xs font-medium hover:bg-violet-500/20 transition-colors">
+                            <FileDown className="w-3 h-3" /> Summary
+                          </button>
+                        )}
+                        {canEditTrips && (
+                          <>
                           {t.status === 'DRAFT' && (
                             <button onClick={() => handleDispatch(t.id)}
                               className="px-3 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-xs font-medium hover:bg-blue-500/30 transition-colors">
@@ -222,8 +296,9 @@ export default function TripsPage() {
                               Cancel
                             </button>
                           )}
-                        </div>
-                      )}
+                          </>
+                        )}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -399,6 +474,92 @@ export default function TripsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {insightTrip && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/60" onClick={() => setInsightTrip(null)} />
+          <div className="relative w-full max-w-2xl max-h-[85vh] overflow-y-auto bg-slate-900 border border-slate-700 rounded-xl p-6">
+            <div className="flex items-start justify-between gap-4 mb-5">
+              <div>
+                <h2 className="text-base font-semibold text-white">
+                  {insightType === 'summary' ? 'Trip Summary' : 'Dispatch Recommendations'}
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">{insightTrip.tripNumber}</p>
+              </div>
+              <button onClick={() => setInsightTrip(null)} className="text-slate-400 hover:text-white" aria-label="Close">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {insightLoading ? (
+              <LoadingSpinner />
+            ) : insightType === 'recommendations' ? (
+              recommendations.length === 0 ? (
+                <EmptyState title="No suitable vehicles" message="No fleet vehicle matches this trip's cargo requirements." />
+              ) : (
+                <div className="space-y-3">
+                  {recommendations.slice(0, 5).map((recommendation, index) => (
+                    <div key={recommendation.vehicle.id} className="bg-slate-800 border border-slate-700 rounded-lg p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-100">
+                            {index + 1}. {recommendation.vehicle.registrationNumber}
+                          </p>
+                          <p className="text-xs text-slate-400 mt-0.5">
+                            {recommendation.vehicle.make} {recommendation.vehicle.model} · {recommendation.vehicle.type}
+                          </p>
+                        </div>
+                        <span className="text-sm font-semibold text-amber-400">{recommendation.score}% match</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1.5 mt-3">
+                        {recommendation.reasons.map((reason) => (
+                          <span key={reason} className="px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 text-xs">
+                            {reason}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )
+            ) : summary ? (
+              <div className="space-y-5">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {[
+                    ['Vehicle', summary.vehicle?.registrationNumber ?? 'N/A'],
+                    ['Driver', summary.driver?.name ?? 'N/A'],
+                    ['Distance', `${summary.metrics.distance} km`],
+                    ['Fuel used', `${summary.metrics.fuelUsed.toFixed(1)} L`],
+                  ].map(([label, value]) => (
+                    <div key={label} className="bg-slate-800 rounded-lg p-3">
+                      <p className="text-xs text-slate-500">{label}</p>
+                      <p className="text-sm font-semibold text-slate-200 mt-1">{value}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {[
+                    ['Total cost', summary.metrics.totalCost],
+                    ['Revenue', summary.metrics.revenue],
+                    ['Net profit', summary.metrics.profit],
+                  ].map(([label, value]) => (
+                    <div key={label} className="border border-slate-700 rounded-lg p-3">
+                      <p className="text-xs text-slate-500">{label}</p>
+                      <p className="text-lg font-semibold text-slate-100 mt-1">{value.toFixed(2)} INR</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-end">
+                  <button onClick={handleDownloadPdf}
+                    className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold px-4 py-2 rounded-md text-sm transition-colors">
+                    <FileDown className="w-4 h-4" /> Download PDF
+                  </button>
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
       )}

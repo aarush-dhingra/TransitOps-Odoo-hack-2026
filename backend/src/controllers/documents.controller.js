@@ -14,6 +14,7 @@ const uploadSchema = z.object({
     'VEHICLE_REGISTRY',
     'INSURANCE_CERTIFICATE',
     'PUC_CERTIFICATE',
+    'FITNESS_CERTIFICATE',
     'MAINTENANCE_INVOICE',
     'FUEL_RECEIPT',
     'OTHER',
@@ -21,6 +22,12 @@ const uploadSchema = z.object({
   vehicleId: z.string().min(1).optional().nullable(),
   driverId: z.string().min(1).optional().nullable(),
   maintenanceLogId: z.string().min(1).optional().nullable(),
+  expiryDate: z
+    .string()
+    .datetime('Expiry date must be a valid ISO datetime')
+    .optional()
+    .nullable()
+    .transform((v) => (v ? new Date(v) : null)),
 });
 
 function cleanupFile(filePath) {
@@ -47,7 +54,7 @@ async function uploadDocument(req, res, next) {
       });
     }
 
-    const { category, vehicleId, driverId, maintenanceLogId } = parsed.data;
+    const { category, vehicleId, driverId, maintenanceLogId, expiryDate } = parsed.data;
 
     if (vehicleId) {
       const v = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
@@ -78,6 +85,7 @@ async function uploadDocument(req, res, next) {
         mimeType: req.file.mimetype,
         sizeBytes: req.file.size,
         category,
+        expiryDate: expiryDate || null,
         vehicleId: vehicleId || null,
         driverId: driverId || null,
         maintenanceLogId: maintenanceLogId || null,
