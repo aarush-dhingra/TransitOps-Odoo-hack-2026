@@ -375,11 +375,6 @@ export default function TripsPage() {
                             Awaiting driver
                           </span>
                         )}
-                        {t.status === 'ACTIVE' && (
-                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 animate-pulse">
-                            En Route
-                          </span>
-                        )}
                       </div>
 
                       {/* Route */}
