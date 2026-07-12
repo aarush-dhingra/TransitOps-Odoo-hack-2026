@@ -1,11 +1,9 @@
 import api from '../lib/axios';
 
+// Do NOT set Content-Type manually — axios sets it automatically with the
+// correct multipart boundary when a FormData object is passed.
 export const uploadDocument = (formData) =>
-  api.post('/documents', formData, {
-    headers: {
-      'Content-Type': 'multipart/form-data',
-    },
-  });
+  api.post('/documents', formData);
 
 export const deleteDocument = (id) =>
   api.delete(`/documents/${id}`);

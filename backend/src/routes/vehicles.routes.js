@@ -20,23 +20,24 @@ const validate = require('../middleware/validate');
 
 const router = Router();
 
-const FM   = 'FLEET_MANAGER';
-const DISP = 'DISPATCHER';
-const FA   = 'FINANCIAL_ANALYST';   // needs read-only for fuel-log vehicle picker
+const FM    = 'FLEET_MANAGER';
+const DISP  = 'DISPATCHER';
+const FA    = 'FINANCIAL_ANALYST';   // needs read-only for fuel-log vehicle picker
+const ADMIN = 'ADMIN';
 
-router.get('/', verifyToken, requireRole(FM, DISP, FA), listVehicles);
-router.post('/', verifyToken, requireRole(FM), validate(createVehicleSchema), createVehicle);
-router.get('/:id/timeline', verifyToken, requireRole(FM, DISP), getVehicleTimeline);
-router.get('/:id/document-vault', verifyToken, requireRole(FM, DISP), getVehicleDocumentVault);
-router.get('/:id', verifyToken, requireRole(FM, DISP, FA), getVehicle);
-router.put('/:id', verifyToken, requireRole(FM), validate(updateVehicleSchema), updateVehicle);
+router.get('/', verifyToken, requireRole(FM, DISP, FA, ADMIN), listVehicles);
+router.post('/', verifyToken, requireRole(FM, ADMIN), validate(createVehicleSchema), createVehicle);
+router.get('/:id/timeline', verifyToken, requireRole(FM, DISP, ADMIN), getVehicleTimeline);
+router.get('/:id/document-vault', verifyToken, requireRole(FM, DISP, ADMIN), getVehicleDocumentVault);
+router.get('/:id', verifyToken, requireRole(FM, DISP, FA, ADMIN), getVehicle);
+router.put('/:id', verifyToken, requireRole(FM, ADMIN), validate(updateVehicleSchema), updateVehicle);
 router.patch(
   '/:id/status',
   verifyToken,
-  requireRole(FM),
+  requireRole(FM, ADMIN),
   validate(patchVehicleStatusSchema),
   patchVehicleStatus
 );
-router.delete('/:id', verifyToken, requireRole(FM), deleteVehicle);
+router.delete('/:id', verifyToken, requireRole(FM, ADMIN), deleteVehicle);
 
 module.exports = router;

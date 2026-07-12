@@ -13,7 +13,7 @@ const {
 
 const router = Router();
 
-const ERP = ['FLEET_MANAGER', 'DISPATCHER', 'SAFETY_OFFICER', 'FINANCIAL_ANALYST'];
+const ERP = ['ADMIN', 'FLEET_MANAGER', 'DISPATCHER', 'SAFETY_OFFICER', 'FINANCIAL_ANALYST'];
 
 function handleMulter(req, res, next) {
   upload.single('file')(req, res, (err) => {
@@ -42,6 +42,6 @@ router.post('/', verifyToken, requireRole(...ERP), handleMulter, uploadDocument)
 router.get('/', verifyToken, requireRole(...ERP), listDocuments);
 router.get('/:id', verifyToken, requireRole(...ERP), getDocument);
 router.get('/:id/file', verifyToken, requireRole(...ERP), serveFile);
-router.delete('/:id', verifyToken, requireRole('FLEET_MANAGER'), deleteDocument);
+router.delete('/:id', verifyToken, requireRole('ADMIN', 'FLEET_MANAGER'), deleteDocument);
 
 module.exports = router;
