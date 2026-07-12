@@ -5,6 +5,7 @@ const prisma = require('../src/utils/prisma');
 
 async function runTests() {
   console.log('Starting API Integration Tests...');
+  const testStartOdometer = 50000;
 
   const req = async (path, method = 'GET', body = null, token = null) => {
     const headers = {
@@ -131,7 +132,10 @@ async function runTests() {
   console.log(`Using Vehicle: ${truck.registrationNumber} (ID: ${truck.id}, Status: ${truck.status})`);
   console.log(`Using Driver: ${driverRecord.name} (ID: ${driverRecord.id}, Status: ${driverRecord.status})`);
 
-  await prisma.vehicle.update({ where: { id: truck.id }, data: { status: 'AVAILABLE', currentOdometer: 50000 } });
+  await prisma.vehicle.update({
+    where: { id: truck.id },
+    data: { status: 'AVAILABLE', currentOdometer: testStartOdometer },
+  });
   await prisma.driver.update({ where: { id: driverRecord.id }, data: { status: 'AVAILABLE' } });
 
   console.log('\n--- 2. Trips CRUD ---');
@@ -148,7 +152,7 @@ async function runTests() {
     plannedArrival: new Date(Date.now() + 86400000 + 14400000).toISOString(),
     vehicleId: truck.id,
     driverId: driverRecord.id,
-    notes: 'Important cargo',
+    notes: 'API verification: primary trip',
   };
 
   const createTripRes = await req('/trips', 'POST', tripBody, dispatcherToken);
@@ -161,7 +165,7 @@ async function runTests() {
 
   const createTrip2Res = await req('/trips', 'POST', {
     ...tripBody,
-    notes: 'Secondary trip',
+    notes: 'API verification: secondary trip',
   }, dispatcherToken);
   if (createTrip2Res.status !== 201) {
     throw new Error('Failed to create secondary trip while driver/vehicle are AVAILABLE');
@@ -214,7 +218,10 @@ async function runTests() {
   if (startRes.status !== 200 || startRes.data.data.status !== 'ACTIVE') {
     throw new Error(`Failed to start trip: ${JSON.stringify(startRes.data)}`);
   }
-  if (!startRes.data.data.actualDeparture || startRes.data.data.startOdometer !== truck.currentOdometer) {
+  if (
+    !startRes.data.data.actualDeparture ||
+    startRes.data.data.startOdometer !== testStartOdometer
+  ) {
     throw new Error(`actualDeparture or startOdometer was not recorded correctly: ${JSON.stringify(startRes.data.data)}`);
   }
   console.log(`Started trip 1 (Start Odometer: ${startRes.data.data.startOdometer}, Actual Departure: ${startRes.data.data.actualDeparture})`);
@@ -251,7 +258,10 @@ async function runTests() {
   console.log('Verified vehicle status automatically changed to MAINTENANCE due to threshold violation');
   console.log('Verified driver status reset to AVAILABLE');
 
-  await prisma.vehicle.update({ where: { id: truck.id }, data: { status: 'AVAILABLE', currentOdometer: 50000 } });
+  await prisma.vehicle.update({
+    where: { id: truck.id },
+    data: { status: 'AVAILABLE', currentOdometer: testStartOdometer },
+  });
 
   console.log('\n--- 5. Fuel Logs & Expenses ---');
 
@@ -387,16 +397,49 @@ async function runTests() {
   }
 }
 
+async function cleanupVerificationData() {
+  const trips = await prisma.trip.findMany({
+    where: { notes: { startsWith: 'API verification:' } },
+    select: { id: true },
+  });
+  const tripIds = trips.map((trip) => trip.id);
+
+  if (tripIds.length > 0) {
+    await prisma.fuelLog.deleteMany({ where: { tripId: { in: tripIds } } });
+    await prisma.expense.deleteMany({ where: { tripId: { in: tripIds } } });
+    await prisma.trip.deleteMany({ where: { id: { in: tripIds } } });
+  }
+
+  await prisma.vehicle.updateMany({
+    where: { registrationNumber: 'MH-12-AB-1234' },
+    data: { status: 'AVAILABLE', currentOdometer: 54200 },
+  });
+  await prisma.driver.updateMany({
+    where: { licenseNumber: 'MH2019001234' },
+    data: { status: 'AVAILABLE' },
+  });
+}
+
 const server = app.listen(3001, async () => {
   console.log('Verification test server running on port 3001');
+  let exitCode = 0;
   try {
     await runTests();
     console.log('\nALL TESTS PASSED SUCCESSFULLY!\n');
-    process.exit(0);
   } catch (err) {
     console.error('\nTEST SUITE FAILED:\n', err);
-    process.exit(1);
+    exitCode = 1;
   } finally {
-    server.close();
+    try {
+      await cleanupVerificationData();
+      console.log('Verification data cleaned up');
+    } catch (cleanupError) {
+      console.error('Verification cleanup failed:', cleanupError);
+      exitCode = 1;
+    }
+    await prisma.$disconnect();
+    server.close(() => {
+      process.exitCode = exitCode;
+    });
   }
 });
