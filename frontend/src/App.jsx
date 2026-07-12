@@ -2,6 +2,7 @@ import { Routes, Route, Navigate } from 'react-router-dom';
 import ProtectedRoute from './components/shared/ProtectedRoute';
 import AppShell from './components/layout/AppShell';
 import DriverPortalShell from './components/layout/DriverPortalShell';
+import { ALL_ERP_ROLES } from './lib/permissions';
 
 import LoginPage from './pages/auth/LoginPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
@@ -14,50 +15,48 @@ import AnalyticsPage from './pages/analytics/AnalyticsPage';
 import SettingsPage from './pages/settings/SettingsPage';
 import DriverPortalPage from './pages/driver-portal/DriverPortalPage';
 
-const ERP_ROLES = ['FLEET_MANAGER', 'DISPATCHER', 'SAFETY_OFFICER', 'FINANCIAL_ANALYST'];
-
 export default function App() {
   return (
     <Routes>
       {/* Public */}
       <Route path="/login" element={<LoginPage />} />
 
-      {/* ERP - all four office roles */}
-      <Route element={<ProtectedRoute allowedRoles={ERP_ROLES} />}>
+      {/* ERP - all office roles + admin */}
+      <Route element={<ProtectedRoute allowedRoles={ALL_ERP_ROLES} />}>
         <Route element={<AppShell />}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/vehicles" element={
-            <ProtectedRoute allowedRoles={['FLEET_MANAGER']} redirect="/dashboard">
+            <ProtectedRoute resource="fleet" redirect="/dashboard">
               <VehiclesPage />
             </ProtectedRoute>
           } />
           <Route path="/drivers" element={
-            <ProtectedRoute allowedRoles={['FLEET_MANAGER', 'SAFETY_OFFICER']} redirect="/dashboard">
+            <ProtectedRoute resource="drivers" redirect="/dashboard">
               <DriversPage />
             </ProtectedRoute>
           } />
           <Route path="/trips" element={
-            <ProtectedRoute allowedRoles={['FLEET_MANAGER', 'DISPATCHER']} redirect="/dashboard">
+            <ProtectedRoute resource="trips" redirect="/dashboard">
               <TripsPage />
             </ProtectedRoute>
           } />
           <Route path="/maintenance" element={
-            <ProtectedRoute allowedRoles={['FLEET_MANAGER']} redirect="/dashboard">
+            <ProtectedRoute resource="maintenance" redirect="/dashboard">
               <MaintenancePage />
             </ProtectedRoute>
           } />
           <Route path="/fuel" element={
-            <ProtectedRoute allowedRoles={['FLEET_MANAGER', 'FINANCIAL_ANALYST']} redirect="/dashboard">
+            <ProtectedRoute resource="fuel" redirect="/dashboard">
               <FuelPage />
             </ProtectedRoute>
           } />
           <Route path="/analytics" element={
-            <ProtectedRoute allowedRoles={['FLEET_MANAGER', 'FINANCIAL_ANALYST']} redirect="/dashboard">
+            <ProtectedRoute resource="analytics" redirect="/dashboard">
               <AnalyticsPage />
             </ProtectedRoute>
           } />
           <Route path="/settings" element={
-            <ProtectedRoute allowedRoles={['FLEET_MANAGER']} redirect="/dashboard">
+            <ProtectedRoute resource="settings" redirect="/dashboard">
               <SettingsPage />
             </ProtectedRoute>
           } />
