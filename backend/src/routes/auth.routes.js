@@ -4,6 +4,7 @@ const { Router } = require('express');
 
 const {
   login,
+  logout,
   me,
   register,
   loginSchema,
@@ -15,6 +16,7 @@ const validate = require('../middleware/validate');
 const router = Router();
 
 router.post('/login', validate(loginSchema), login);
+router.post('/logout', verifyToken, logout);
 router.get('/me', verifyToken, me);
 router.post(
   '/register',

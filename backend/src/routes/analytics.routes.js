@@ -16,8 +16,9 @@ const router = Router();
 const FM = 'FLEET_MANAGER';
 const FA = 'FINANCIAL_ANALYST';
 const SO = 'SAFETY_OFFICER';
+const DISP = 'DISPATCHER';
 
-router.get('/dashboard', verifyToken, requireRole(FM), getDashboard);
+router.get('/dashboard', verifyToken, requireRole(FM, DISP, SO, FA), getDashboard);
 router.get('/alerts', verifyToken, requireRole(FM, SO), getAlerts);
 router.get('/utilization', verifyToken, requireRole(FM), getUtilization);
 router.get('/fuel-efficiency', verifyToken, requireRole(FM, FA), getFuelEfficiency);

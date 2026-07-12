@@ -8,6 +8,8 @@ const prisma = require('../utils/prisma');
 const { success, error } = require('../utils/response');
 
 const SALT_ROUNDS = 10;
+const LOCKOUT_MAX_ATTEMPTS = 5;
+const LOCKOUT_DURATION_MS = 15 * 60 * 1000; // 15 minutes
 
 const USER_SAFE_SELECT = {
   id: true,
@@ -47,9 +49,44 @@ async function login(req, res, next) {
       return error(res, 'INVALID_CREDENTIALS', 'Email or password is incorrect.', 401);
     }
 
+    // Check if account is locked
+    if (user.lockedUntil && user.lockedUntil > new Date()) {
+      const waitSecs = Math.ceil((user.lockedUntil.getTime() - Date.now()) / 1000);
+      return error(
+        res,
+        'ACCOUNT_LOCKED',
+        `Account is locked due to too many failed attempts. Try again in ${waitSecs} seconds.`,
+        423
+      );
+    }
+
     const valid = await bcrypt.compare(password, user.passwordHash);
+
     if (!valid) {
-      return error(res, 'INVALID_CREDENTIALS', 'Email or password is incorrect.', 401);
+      const newAttempts = user.failedLoginAttempts + 1;
+      const updateData = { failedLoginAttempts: newAttempts };
+
+      if (newAttempts >= LOCKOUT_MAX_ATTEMPTS) {
+        updateData.lockedUntil = new Date(Date.now() + LOCKOUT_DURATION_MS);
+      }
+
+      await prisma.user.update({ where: { id: user.id }, data: updateData });
+
+      const remaining = LOCKOUT_MAX_ATTEMPTS - newAttempts;
+      const message =
+        remaining > 0
+          ? `Email or password is incorrect. ${remaining} attempt(s) remaining before lockout.`
+          : 'Account locked for 15 minutes due to too many failed login attempts.';
+
+      return error(res, 'INVALID_CREDENTIALS', message, 401);
+    }
+
+    // Successful login — reset lockout counter
+    if (user.failedLoginAttempts > 0 || user.lockedUntil) {
+      await prisma.user.update({
+        where: { id: user.id },
+        data: { failedLoginAttempts: 0, lockedUntil: null },
+      });
     }
 
     const payload = {
@@ -74,6 +111,26 @@ async function login(req, res, next) {
         driverId: user.driverProfile ? user.driverProfile.id : null,
       },
     });
+  } catch (err) {
+    return next(err);
+  }
+}
+
+async function logout(req, res, next) {
+  try {
+    const token = req._rawToken;
+    const decoded = jwt.decode(token);
+    const expiresAt = decoded?.exp
+      ? new Date(decoded.exp * 1000)
+      : new Date(Date.now() + 8 * 3600 * 1000);
+
+    await prisma.revokedToken.upsert({
+      where: { token },
+      update: {},
+      create: { token, expiresAt },
+    });
+
+    return res.status(204).send();
   } catch (err) {
     return next(err);
   }
@@ -121,4 +178,4 @@ async function register(req, res, next) {
   }
 }
 
-module.exports = { login, me, register, loginSchema, registerSchema };
+module.exports = { login, logout, me, register, loginSchema, registerSchema };

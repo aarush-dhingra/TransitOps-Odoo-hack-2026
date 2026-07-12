@@ -7,18 +7,52 @@ const { success } = require('../utils/response');
 
 async function getDashboard(req, res, next) {
   try {
+    // Optional vehicle filters for KPIs
+    const vehicleWhere = {};
+    if (req.query.region) vehicleWhere.region = req.query.region;
+    if (req.query.vehicleType) vehicleWhere.type = req.query.vehicleType;
+    if (req.query.vehicleStatus) vehicleWhere.status = req.query.vehicleStatus;
+
+    const now = new Date();
+    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+
     const [
       vehicleStatusGroups,
       driverStatusGroups,
       activeTripsCount,
+      pendingTripsCount,
       totalTripsCount,
       completedTripsCount,
+      totalNonRetiredVehicles,
+      vehiclesOnTrip,
+      recentTrips,
+      totalFuelCostThisMonth,
+      totalExpensesThisMonth,
     ] = await Promise.all([
-      prisma.vehicle.groupBy({ by: ['status'], _count: { id: true } }),
+      prisma.vehicle.groupBy({ by: ['status'], _count: { id: true }, where: vehicleWhere }),
       prisma.driver.groupBy({ by: ['status'], _count: { id: true } }),
       prisma.trip.count({ where: { status: { in: ['DISPATCHED', 'ACTIVE'] } } }),
+      prisma.trip.count({ where: { status: { in: ['DRAFT', 'PENDING'] } } }),
       prisma.trip.count(),
       prisma.trip.count({ where: { status: 'COMPLETED' } }),
+      prisma.vehicle.count({ where: { ...vehicleWhere, status: { not: 'RETIRED' } } }),
+      prisma.vehicle.count({ where: { ...vehicleWhere, status: 'ON_TRIP' } }),
+      prisma.trip.findMany({
+        orderBy: { createdAt: 'desc' },
+        take: 10,
+        include: {
+          vehicle: { select: { id: true, registrationNumber: true, make: true, model: true } },
+          driver: { select: { id: true, name: true } },
+        },
+      }),
+      prisma.fuelLog.aggregate({
+        where: { date: { gte: startOfMonth } },
+        _sum: { totalCost: true },
+      }),
+      prisma.expense.aggregate({
+        where: { date: { gte: startOfMonth } },
+        _sum: { amount: true },
+      }),
     ]);
 
     const maintenanceDueRaw = await prisma.$queryRaw`
@@ -28,29 +62,33 @@ async function getDashboard(req, res, next) {
       WHERE v.current_odometer >= s.next_due_odometer
     `;
 
-    const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-    const [totalFuelCostThisMonth, totalExpensesThisMonth] = await Promise.all([
-      prisma.fuelLog.aggregate({
-        where: { date: { gte: startOfMonth } },
-        _sum: { totalCost: true },
-      }),
-      prisma.expense.aggregate({ where: { date: { gte: startOfMonth } }, _sum: { amount: true } }),
-    ]);
+    const driversOnDuty =
+      driverStatusGroups.find((g) => g.status === 'ON_TRIP')?._count.id || 0;
+
+    const fleetUtilizationPct =
+      totalNonRetiredVehicles > 0
+        ? Math.round((vehiclesOnTrip / totalNonRetiredVehicles) * 100)
+        : 0;
 
     return success(res, {
       vehicles: {
         byStatus: vehicleStatusGroups.map((g) => ({ status: g.status, count: g._count.id })),
+        total: totalNonRetiredVehicles,
+        onTrip: vehiclesOnTrip,
         maintenanceDue: maintenanceDueRaw[0]?.count || 0,
+        utilizationPct: fleetUtilizationPct,
       },
       drivers: {
         byStatus: driverStatusGroups.map((g) => ({ status: g.status, count: g._count.id })),
+        onDuty: driversOnDuty,
       },
       trips: {
         active: activeTripsCount,
+        pending: pendingTripsCount,
         total: totalTripsCount,
         completed: completedTripsCount,
       },
+      recentTrips,
       costsThisMonth: {
         fuel: totalFuelCostThisMonth._sum.totalCost || 0,
         expenses: totalExpensesThisMonth._sum.amount || 0,
