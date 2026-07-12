@@ -17,9 +17,16 @@ const createVehicleSchema = z.object({
   fuelType: z.enum(['DIESEL', 'PETROL', 'CNG', 'ELECTRIC']),
   tankCapacity: z.number().positive(),
   currentOdometer: z.number().min(0).optional().default(0),
-  status: z.enum(['AVAILABLE', 'ON_TRIP', 'MAINTENANCE', 'RETIRED']).optional().default('AVAILABLE'),
+  status: z.enum(['AVAILABLE', 'ON_TRIP', 'IN_SHOP', 'MAINTENANCE', 'RETIRED']).optional().default('AVAILABLE'),
+  maximumLoadCapacity: z.number().positive().optional().nullable(),
+  acquisitionCost: z.number().positive().optional().nullable(),
+  region: z.string().max(100).optional().nullable(),
   insuranceExpiry: z.coerce.date().optional().nullable(),
   pucExpiry: z.coerce.date().optional().nullable(),
+});
+
+const patchVehicleStatusSchema = z.object({
+  status: z.enum(['AVAILABLE', 'ON_TRIP', 'IN_SHOP', 'MAINTENANCE', 'RETIRED']),
 });
 
 const updateVehicleSchema = z.object({
@@ -31,7 +38,10 @@ const updateVehicleSchema = z.object({
   fuelType: z.enum(['DIESEL', 'PETROL', 'CNG', 'ELECTRIC']).optional(),
   tankCapacity: z.number().positive().optional(),
   currentOdometer: z.number().min(0).optional(),
-  status: z.enum(['AVAILABLE', 'ON_TRIP', 'MAINTENANCE', 'RETIRED']).optional(),
+  status: z.enum(['AVAILABLE', 'ON_TRIP', 'IN_SHOP', 'MAINTENANCE', 'RETIRED']).optional(),
+  maximumLoadCapacity: z.number().positive().optional().nullable(),
+  acquisitionCost: z.number().positive().optional().nullable(),
+  region: z.string().max(100).optional().nullable(),
   insuranceExpiry: z.coerce.date().optional().nullable(),
   pucExpiry: z.coerce.date().optional().nullable(),
 });
@@ -169,12 +179,40 @@ async function deleteVehicle(req, res, next) {
   }
 }
 
+async function patchVehicleStatus(req, res, next) {
+  try {
+    const existing = await prisma.vehicle.findUnique({ where: { id: req.params.id } });
+    if (!existing) {
+      return error(res, 'NOT_FOUND', 'Vehicle not found.', 404);
+    }
+
+    const vehicle = await prisma.vehicle.update({
+      where: { id: req.params.id },
+      data: { status: req.body.status },
+    });
+
+    await writeAuditLog({
+      userId: req.user.id,
+      action: 'VEHICLE_STATUS_CHANGED',
+      entityType: 'VEHICLE',
+      entityId: vehicle.id,
+      details: { previousStatus: existing.status, newStatus: req.body.status },
+    });
+
+    return success(res, vehicle);
+  } catch (err) {
+    return next(err);
+  }
+}
+
 module.exports = {
   listVehicles,
   getVehicle,
   createVehicle,
   updateVehicle,
   deleteVehicle,
+  patchVehicleStatus,
   createVehicleSchema,
   updateVehicleSchema,
+  patchVehicleStatusSchema,
 };

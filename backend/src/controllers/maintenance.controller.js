@@ -39,12 +39,6 @@ const createScheduleSchema = z.object({
   nextDueOdometer: z.number().min(0),
 });
 
-const updateScheduleSchema = z.object({
-  serviceType: z.enum(['OIL_CHANGE', 'TYRE_ROTATION', 'FULL_SERVICE', 'BRAKE_SERVICE', 'ENGINE_CHECK', 'OTHER']).optional(),
-  intervalKm: z.number().positive().optional(),
-  lastOdometer: z.number().min(0).optional(),
-  nextDueOdometer: z.number().min(0).optional(),
-});
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -117,12 +111,12 @@ async function createLog(req, res, next) {
         data: { ...req.body, createdById: req.user.id },
       });
 
-      // When created as SCHEDULED, set vehicle status to MAINTENANCE
+      // When starting maintenance, set vehicle to IN_SHOP
       if (newLog.status === 'SCHEDULED' || newLog.status === 'IN_PROGRESS') {
         if (vehicle.status === 'AVAILABLE') {
           await tx.vehicle.update({
             where: { id: vehicle.id },
-            data: { status: 'MAINTENANCE' },
+            data: { status: 'IN_SHOP' },
           });
         }
       }
@@ -187,11 +181,14 @@ async function updateLog(req, res, next) {
           });
         }
 
-        // Return vehicle to AVAILABLE now that maintenance is done
-        await tx.vehicle.update({
-          where: { id: existing.vehicleId },
-          data: { status: 'AVAILABLE' },
-        });
+        // Return vehicle to AVAILABLE now that maintenance is done (unless it is retired)
+        const currentVehicle = await tx.vehicle.findUnique({ where: { id: existing.vehicleId } });
+        if (currentVehicle && currentVehicle.status !== 'RETIRED') {
+          await tx.vehicle.update({
+            where: { id: existing.vehicleId },
+            data: { status: 'AVAILABLE' },
+          });
+        }
 
         return updated;
       });
@@ -218,13 +215,15 @@ async function updateLog(req, res, next) {
 
 // ─── Schedule handlers ────────────────────────────────────────────────────────
 
-async function listSchedules(req, res, next) {
+async function listSchedulesByVehicle(req, res, next) {
   try {
-    const where = {};
-    if (req.query.vehicleId) { where.vehicleId = req.query.vehicleId; }
+    const vehicle = await prisma.vehicle.findUnique({ where: { id: req.params.vehicleId } });
+    if (!vehicle) {
+      return error(res, 'NOT_FOUND', 'Vehicle not found.', 404);
+    }
 
     const schedules = await prisma.maintenanceSchedule.findMany({
-      where,
+      where: { vehicleId: req.params.vehicleId },
       orderBy: { createdAt: 'desc' },
       include: {
         vehicle: { select: { id: true, registrationNumber: true, make: true, model: true, currentOdometer: true } },
@@ -260,42 +259,15 @@ async function createSchedule(req, res, next) {
   }
 }
 
-async function updateSchedule(req, res, next) {
-  try {
-    const existing = await prisma.maintenanceSchedule.findUnique({ where: { id: req.params.scheduleId } });
-    if (!existing) {
-      return error(res, 'NOT_FOUND', 'Maintenance schedule not found.', 404);
-    }
-
-    const schedule = await prisma.maintenanceSchedule.update({
-      where: { id: req.params.scheduleId },
-      data: req.body,
-    });
-
-    await writeAuditLog({
-      userId: req.user.id,
-      action: 'MAINTENANCE_SCHEDULE_UPDATED',
-      entityType: 'MAINTENANCE_SCHEDULE',
-      entityId: schedule.id,
-      details: req.body,
-    });
-
-    return success(res, schedule);
-  } catch (err) {
-    return next(err);
-  }
-}
 
 module.exports = {
   listLogs,
   getLog,
   createLog,
   updateLog,
-  listSchedules,
+  listSchedulesByVehicle,
   createSchedule,
-  updateSchedule,
   createLogSchema,
   updateLogSchema,
   createScheduleSchema,
-  updateScheduleSchema,
 };

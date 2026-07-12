@@ -29,6 +29,10 @@ const createDriverSchema = z
     { message: 'portalEmail and portalPassword are required when createPortalAccess is true.' }
   );
 
+const patchDriverStatusSchema = z.object({
+  status: z.enum(['AVAILABLE', 'ON_TRIP', 'OFF_DUTY', 'ON_LEAVE', 'SUSPENDED']),
+});
+
 const updateDriverSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   phone: z.string().min(7).max(15).optional(),
@@ -245,6 +249,52 @@ async function deleteDriver(req, res, next) {
   }
 }
 
+async function patchDriverStatus(req, res, next) {
+  try {
+    const driver = await prisma.driver.findUnique({ where: { id: req.params.id } });
+    if (!driver) {
+      return error(res, 'NOT_FOUND', 'Driver not found.', 404);
+    }
+
+    const { status } = req.body;
+
+    if (driver.status === status) {
+      return error(res, 'CONFLICT', `Driver is already ${status}.`, 409);
+    }
+
+    if (driver.status === 'ON_TRIP' && status !== 'ON_TRIP') {
+      return error(res, 'CONFLICT', 'Cannot change status of a driver who is currently on a trip.', 409);
+    }
+
+    if (status === 'AVAILABLE' && driver.licenseExpiry <= new Date()) {
+      return error(res, 'VALIDATION_ERROR', 'Cannot set driver to AVAILABLE with an expired license.', 422);
+    }
+
+    const updateData = { status };
+    if (status === 'SUSPENDED' && driver.status !== 'SUSPENDED') {
+      updateData.safetyScore = Math.max(0, driver.safetyScore - 10);
+    }
+
+    const updated = await prisma.driver.update({
+      where: { id: req.params.id },
+      data: updateData,
+      select: DRIVER_SELECT,
+    });
+
+    await writeAuditLog({
+      userId: req.user.id,
+      action: `DRIVER_STATUS_CHANGED`,
+      entityType: 'DRIVER',
+      entityId: driver.id,
+      details: { previousStatus: driver.status, newStatus: status, safetyScore: updated.safetyScore },
+    });
+
+    return success(res, updated);
+  } catch (err) {
+    return next(err);
+  }
+}
+
 async function suspendDriver(req, res, next) {
   try {
     const driver = await prisma.driver.findUnique({ where: { id: req.params.id } });
@@ -327,8 +377,10 @@ module.exports = {
   createDriver,
   updateDriver,
   deleteDriver,
+  patchDriverStatus,
   suspendDriver,
   reinstateDriver,
   createDriverSchema,
   updateDriverSchema,
+  patchDriverStatusSchema,
 };

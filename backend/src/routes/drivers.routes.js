@@ -8,10 +8,10 @@ const {
   createDriver,
   updateDriver,
   deleteDriver,
-  suspendDriver,
-  reinstateDriver,
+  patchDriverStatus,
   createDriverSchema,
   updateDriverSchema,
+  patchDriverStatusSchema,
 } = require('../controllers/drivers.controller');
 const { verifyToken, requireRole } = require('../middleware/auth');
 const validate = require('../middleware/validate');
@@ -26,8 +26,7 @@ router.get('/', verifyToken, requireRole(FM, SO, DISP), listDrivers);
 router.post('/', verifyToken, requireRole(SO, FM), validate(createDriverSchema), createDriver);
 router.get('/:id', verifyToken, requireRole(FM, SO, DISP), getDriver);
 router.put('/:id', verifyToken, requireRole(SO, FM), validate(updateDriverSchema), updateDriver);
+router.patch('/:id/status', verifyToken, requireRole(SO, FM), validate(patchDriverStatusSchema), patchDriverStatus);
 router.delete('/:id', verifyToken, requireRole(FM), deleteDriver);
-router.patch('/:id/suspend', verifyToken, requireRole(SO), suspendDriver);
-router.patch('/:id/reinstate', verifyToken, requireRole(SO), reinstateDriver);
 
 module.exports = router;

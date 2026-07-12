@@ -27,7 +27,7 @@ async function checkMaintenanceDue(vehicleId, newOdometer, tx) {
   if (dueSchedules.length > 0) {
     await client.vehicle.update({
       where: { id: vehicleId },
-      data: { status: 'MAINTENANCE' },
+      data: { status: 'IN_SHOP' },
     });
     return true;
   }

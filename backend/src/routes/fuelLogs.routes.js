@@ -1,20 +1,17 @@
 'use strict';
 
 const { Router } = require('express');
+
 const { verifyToken, requireRole } = require('../middleware/auth');
-const {
-  getFuelLogs,
-  getFuelLogById,
-  createFuelLog,
-  deleteFuelLog,
-} = require('../controllers/fuelLogs.controller');
+const { getFuelLogs, createFuelLog, deleteFuelLog } = require('../controllers/fuelLogs.controller');
 
 const router = Router();
 
-router.get('/', verifyToken, requireRole('FINANCIAL_ANALYST', 'FLEET_MANAGER'), getFuelLogs);
-router.post('/', verifyToken, requireRole('FINANCIAL_ANALYST', 'FLEET_MANAGER'), createFuelLog);
+const FM = 'FLEET_MANAGER';
+const FA = 'FINANCIAL_ANALYST';
 
-router.get('/:id', verifyToken, requireRole('FINANCIAL_ANALYST'), getFuelLogById);
-router.delete('/:id', verifyToken, requireRole('FINANCIAL_ANALYST'), deleteFuelLog);
+router.get('/', verifyToken, requireRole(FA, FM), getFuelLogs);
+router.post('/', verifyToken, requireRole(FA, FM), createFuelLog);
+router.delete('/:id', verifyToken, requireRole(FA, FM), deleteFuelLog);
 
 module.exports = router;
