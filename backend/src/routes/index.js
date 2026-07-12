@@ -11,24 +11,19 @@ const fuelLogRoutes = require('./fuelLogs.routes');
 const expenseRoutes = require('./expenses.routes');
 const analyticsRoutes = require('./analytics.routes');
 const portalRoutes = require('./portal.routes');
+const adminRoutes = require('./admin.routes');
 
 const router = Router();
 
-
 router.use('/auth', authRoutes);
-
-
 router.use('/vehicles', vehicleRoutes);
 router.use('/drivers', driverRoutes);
 router.use('/maintenance', maintenanceRoutes);
-
-// ─── Operations + Finance domain (Person B) ───────────────────────────────
 router.use('/trips', tripRoutes);
 router.use('/fuel-logs', fuelLogRoutes);
 router.use('/expenses', expenseRoutes);
 router.use('/analytics', analyticsRoutes);
-
-// ─── Driver portal (Person B) ────────────────────────────────────────────
 router.use('/portal', portalRoutes);
+router.use('/admin', adminRoutes);
 
 module.exports = router;

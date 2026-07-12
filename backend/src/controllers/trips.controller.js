@@ -43,19 +43,19 @@ const dispatchTripSchema = z.object({
 
 async function assertVehicleAvailable(vehicleId, cargoWeight) {
   const vehicle = await prisma.vehicle.findUnique({ where: { id: vehicleId } });
-  if (!vehicle) { return { err: 'NOT_FOUND:Vehicle not found.' }; }
-  if (vehicle.status === 'RETIRED') { return { err: 'VEHICLE_NOT_AVAILABLE:Vehicle is retired.' }; }
+  if (!vehicle) {
+    return { err: 'NOT_FOUND:Vehicle not found.' };
+  }
+  if (vehicle.status === 'RETIRED') {
+    return { err: 'VEHICLE_NOT_AVAILABLE:Vehicle is retired.' };
+  }
   if (vehicle.status === 'IN_SHOP' || vehicle.status === 'MAINTENANCE') {
     return { err: 'VEHICLE_NOT_AVAILABLE:Vehicle is currently in the shop for maintenance.' };
   }
   if (vehicle.status === 'ON_TRIP') {
     return { err: 'VEHICLE_NOT_AVAILABLE:Vehicle is already on a trip.' };
   }
-  if (
-    cargoWeight &&
-    vehicle.maximumLoadCapacity &&
-    cargoWeight > vehicle.maximumLoadCapacity
-  ) {
+  if (cargoWeight && vehicle.maximumLoadCapacity && cargoWeight > vehicle.maximumLoadCapacity) {
     return {
       err: `CARGO_WEIGHT_EXCEEDED:Cargo weight (${cargoWeight} kg) exceeds vehicle capacity (${vehicle.maximumLoadCapacity} kg).`,
     };
@@ -65,7 +65,9 @@ async function assertVehicleAvailable(vehicleId, cargoWeight) {
 
 async function assertDriverAvailable(driverId) {
   const driver = await prisma.driver.findUnique({ where: { id: driverId } });
-  if (!driver) { return { err: 'NOT_FOUND:Driver not found.' }; }
+  if (!driver) {
+    return { err: 'NOT_FOUND:Driver not found.' };
+  }
   if (driver.status === 'SUSPENDED') {
     return { err: 'DRIVER_NOT_AVAILABLE:Driver is suspended.' };
   }
@@ -93,13 +95,23 @@ async function getTrips(req, res, next) {
     const skip = (page - 1) * limit;
 
     const where = {};
-    if (req.query.status) { where.status = req.query.status; }
-    if (req.query.vehicleId) { where.vehicleId = req.query.vehicleId; }
-    if (req.query.driverId) { where.driverId = req.query.driverId; }
+    if (req.query.status) {
+      where.status = req.query.status;
+    }
+    if (req.query.vehicleId) {
+      where.vehicleId = req.query.vehicleId;
+    }
+    if (req.query.driverId) {
+      where.driverId = req.query.driverId;
+    }
     if (req.query.from || req.query.to) {
       where.plannedDeparture = {};
-      if (req.query.from) { where.plannedDeparture.gte = new Date(req.query.from); }
-      if (req.query.to) { where.plannedDeparture.lte = new Date(req.query.to); }
+      if (req.query.from) {
+        where.plannedDeparture.gte = new Date(req.query.from);
+      }
+      if (req.query.to) {
+        where.plannedDeparture.lte = new Date(req.query.to);
+      }
     }
 
     const [items, total] = await Promise.all([
@@ -126,7 +138,9 @@ async function getTripById(req, res, next) {
       include: { vehicle: true, driver: true, fuelLogs: true, expenses: true },
     });
 
-    if (!trip) { return error(res, 'NOT_FOUND', 'Trip not found.', 404); }
+    if (!trip) {
+      return error(res, 'NOT_FOUND', 'Trip not found.', 404);
+    }
 
     return success(res, trip);
   } catch (err) {
@@ -141,13 +155,17 @@ async function createTrip(req, res, next) {
     // Validate vehicle if provided
     if (vehicleId) {
       const { err } = await assertVehicleAvailable(vehicleId, cargoWeight);
-      if (err) { return sendValidationError(res, err); }
+      if (err) {
+        return sendValidationError(res, err);
+      }
     }
 
     // Validate driver if provided
     if (driverId) {
       const { err } = await assertDriverAvailable(driverId);
-      if (err) { return sendValidationError(res, err); }
+      if (err) {
+        return sendValidationError(res, err);
+      }
     }
 
     const newTrip = await prisma.$transaction(async (tx) => {
@@ -175,7 +193,9 @@ async function createTrip(req, res, next) {
 async function updateTrip(req, res, next) {
   try {
     const trip = await prisma.trip.findUnique({ where: { id: req.params.id } });
-    if (!trip) { return error(res, 'NOT_FOUND', 'Trip not found.', 404); }
+    if (!trip) {
+      return error(res, 'NOT_FOUND', 'Trip not found.', 404);
+    }
 
     if (trip.status !== 'DRAFT' && trip.status !== 'PENDING') {
       return error(res, 'INVALID_TRIP_STATUS', 'Only DRAFT trips can be updated.', 400);
@@ -185,12 +205,16 @@ async function updateTrip(req, res, next) {
 
     if (vehicleId && vehicleId !== trip.vehicleId) {
       const { err } = await assertVehicleAvailable(vehicleId, cargoWeight ?? trip.cargoWeight);
-      if (err) { return sendValidationError(res, err); }
+      if (err) {
+        return sendValidationError(res, err);
+      }
     }
 
     if (driverId && driverId !== trip.driverId) {
       const { err } = await assertDriverAvailable(driverId);
-      if (err) { return sendValidationError(res, err); }
+      if (err) {
+        return sendValidationError(res, err);
+      }
     }
 
     const updatedTrip = await prisma.trip.update({
@@ -212,10 +236,17 @@ async function dispatchTrip(req, res, next) {
       include: { vehicle: true, driver: true },
     });
 
-    if (!trip) { return error(res, 'NOT_FOUND', 'Trip not found.', 404); }
+    if (!trip) {
+      return error(res, 'NOT_FOUND', 'Trip not found.', 404);
+    }
 
     if (trip.status !== 'DRAFT' && trip.status !== 'PENDING') {
-      return error(res, 'INVALID_TRANSITION', 'Only DRAFT or PENDING trips can be dispatched.', 400);
+      return error(
+        res,
+        'INVALID_TRANSITION',
+        'Only DRAFT or PENDING trips can be dispatched.',
+        400
+      );
     }
 
     // Use IDs from request body (assign at dispatch) or from the trip record
@@ -232,10 +263,14 @@ async function dispatchTrip(req, res, next) {
     }
 
     const { err: vErr, vehicle } = await assertVehicleAvailable(vehicleId, trip.cargoWeight);
-    if (vErr) { return sendValidationError(res, vErr); }
+    if (vErr) {
+      return sendValidationError(res, vErr);
+    }
 
     const { err: dErr } = await assertDriverAvailable(driverId);
-    if (dErr) { return sendValidationError(res, dErr); }
+    if (dErr) {
+      return sendValidationError(res, dErr);
+    }
 
     const startOdometer = req.body.startOdometer ?? vehicle.currentOdometer;
 
@@ -261,7 +296,10 @@ async function completeTrip(req, res, next) {
   try {
     const parsedBody = z.object({ endOdometer: z.number().positive() }).safeParse(req.body);
     if (!parsedBody.success) {
-      const issues = parsedBody.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message }));
+      const issues = parsedBody.error.issues.map((i) => ({
+        field: i.path.join('.'),
+        message: i.message,
+      }));
       return res.status(422).json({
         success: false,
         data: null,
@@ -275,7 +313,9 @@ async function completeTrip(req, res, next) {
       include: { vehicle: true },
     });
 
-    if (!trip) { return error(res, 'NOT_FOUND', 'Trip not found.', 404); }
+    if (!trip) {
+      return error(res, 'NOT_FOUND', 'Trip not found.', 404);
+    }
     if (trip.status !== 'ACTIVE') {
       return error(res, 'INVALID_TRANSITION', 'Only ACTIVE trips can be completed.', 400);
     }
@@ -296,7 +336,9 @@ async function completeTrip(req, res, next) {
         data: { status: 'COMPLETED', actualArrival: new Date(), endOdometer },
       });
 
-      const schedules = await tx.maintenanceSchedule.findMany({ where: { vehicleId: trip.vehicleId } });
+      const schedules = await tx.maintenanceSchedule.findMany({
+        where: { vehicleId: trip.vehicleId },
+      });
       const maintenanceDue = schedules.some((s) => endOdometer >= s.nextDueOdometer);
 
       await tx.vehicle.update({
@@ -319,10 +361,17 @@ async function cancelTrip(req, res, next) {
   try {
     const trip = await prisma.trip.findUnique({ where: { id: req.params.id } });
 
-    if (!trip) { return error(res, 'NOT_FOUND', 'Trip not found.', 404); }
+    if (!trip) {
+      return error(res, 'NOT_FOUND', 'Trip not found.', 404);
+    }
 
     if (trip.status === 'COMPLETED' || trip.status === 'CANCELLED') {
-      return error(res, 'INVALID_TRANSITION', `Cannot cancel a trip that is already ${trip.status}.`, 400);
+      return error(
+        res,
+        'INVALID_TRANSITION',
+        `Cannot cancel a trip that is already ${trip.status}.`,
+        400
+      );
     }
 
     const cancelled = await prisma.$transaction(async (tx) => {

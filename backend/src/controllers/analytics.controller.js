@@ -31,7 +31,10 @@ async function getDashboard(req, res, next) {
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const [totalFuelCostThisMonth, totalExpensesThisMonth] = await Promise.all([
-      prisma.fuelLog.aggregate({ where: { date: { gte: startOfMonth } }, _sum: { totalCost: true } }),
+      prisma.fuelLog.aggregate({
+        where: { date: { gte: startOfMonth } },
+        _sum: { totalCost: true },
+      }),
       prisma.expense.aggregate({ where: { date: { gte: startOfMonth } }, _sum: { amount: true } }),
     ]);
 
@@ -66,32 +69,39 @@ async function getAlerts(req, res, next) {
     const in30Days = new Date(now);
     in30Days.setDate(in30Days.getDate() + 30);
 
-    const [expiringLicenses, expiringInsurance, expiredPuc, maintenanceDueVehicles] = await Promise.all([
-      prisma.driver.findMany({
-        where: {
-          licenseExpiry: { lte: in30Days },
-          status: { not: 'SUSPENDED' },
-        },
-        select: { id: true, name: true, licenseNumber: true, licenseExpiry: true, status: true },
-        orderBy: { licenseExpiry: 'asc' },
-      }),
-      prisma.vehicle.findMany({
-        where: {
-          insuranceExpiry: { lte: in30Days },
-          status: { not: 'RETIRED' },
-        },
-        select: { id: true, registrationNumber: true, make: true, model: true, insuranceExpiry: true },
-        orderBy: { insuranceExpiry: 'asc' },
-      }),
-      prisma.vehicle.findMany({
-        where: {
-          pucExpiry: { lte: now },
-          status: { not: 'RETIRED' },
-        },
-        select: { id: true, registrationNumber: true, make: true, model: true, pucExpiry: true },
-        orderBy: { pucExpiry: 'asc' },
-      }),
-      prisma.$queryRaw`
+    const [expiringLicenses, expiringInsurance, expiredPuc, maintenanceDueVehicles] =
+      await Promise.all([
+        prisma.driver.findMany({
+          where: {
+            licenseExpiry: { lte: in30Days },
+            status: { not: 'SUSPENDED' },
+          },
+          select: { id: true, name: true, licenseNumber: true, licenseExpiry: true, status: true },
+          orderBy: { licenseExpiry: 'asc' },
+        }),
+        prisma.vehicle.findMany({
+          where: {
+            insuranceExpiry: { lte: in30Days },
+            status: { not: 'RETIRED' },
+          },
+          select: {
+            id: true,
+            registrationNumber: true,
+            make: true,
+            model: true,
+            insuranceExpiry: true,
+          },
+          orderBy: { insuranceExpiry: 'asc' },
+        }),
+        prisma.vehicle.findMany({
+          where: {
+            pucExpiry: { lte: now },
+            status: { not: 'RETIRED' },
+          },
+          select: { id: true, registrationNumber: true, make: true, model: true, pucExpiry: true },
+          orderBy: { pucExpiry: 'asc' },
+        }),
+        prisma.$queryRaw`
         SELECT v.id, v.registration_number, v.make, v.model, v.current_odometer,
                s.service_type, s.next_due_odometer,
                (v.current_odometer - s.next_due_odometer) AS overdue_km
@@ -100,7 +110,7 @@ async function getAlerts(req, res, next) {
         WHERE v.current_odometer >= s.next_due_odometer
         ORDER BY overdue_km DESC
       `,
-    ]);
+      ]);
 
     return success(res, {
       expiringLicenses,
@@ -118,7 +128,9 @@ async function getAlerts(req, res, next) {
 async function getUtilization(req, res, next) {
   try {
     const now = new Date();
-    const from = req.query.from ? new Date(req.query.from) : new Date(now.getFullYear(), now.getMonth(), 1);
+    const from = req.query.from
+      ? new Date(req.query.from)
+      : new Date(now.getFullYear(), now.getMonth(), 1);
     const to = req.query.to ? new Date(req.query.to) : now;
 
     const [totalVehicles, totalDrivers, tripsInPeriod] = await Promise.all([
@@ -148,12 +160,14 @@ async function getUtilization(req, res, next) {
       vehicles: {
         total: totalVehicles,
         utilized: uniqueVehiclesUsed,
-        utilizationRate: totalVehicles > 0 ? Math.round((uniqueVehiclesUsed / totalVehicles) * 100) : 0,
+        utilizationRate:
+          totalVehicles > 0 ? Math.round((uniqueVehiclesUsed / totalVehicles) * 100) : 0,
       },
       drivers: {
         total: totalDrivers,
         utilized: uniqueDriversUsed,
-        utilizationRate: totalDrivers > 0 ? Math.round((uniqueDriversUsed / totalDrivers) * 100) : 0,
+        utilizationRate:
+          totalDrivers > 0 ? Math.round((uniqueDriversUsed / totalDrivers) * 100) : 0,
       },
       trips: {
         total: tripsInPeriod.length,
@@ -210,29 +224,30 @@ async function getFuelEfficiency(req, res, next) {
 
 async function getCosts(req, res, next) {
   try {
-    const [expenseByCategory, fuelByMonth, expenseByMonth, totalFuel, totalExpense] = await Promise.all([
-      prisma.expense.groupBy({
-        by: ['category'],
-        _sum: { amount: true },
-        orderBy: { _sum: { amount: 'desc' } },
-      }),
-      prisma.$queryRaw`
+    const [expenseByCategory, fuelByMonth, expenseByMonth, totalFuel, totalExpense] =
+      await Promise.all([
+        prisma.expense.groupBy({
+          by: ['category'],
+          _sum: { amount: true },
+          orderBy: { _sum: { amount: 'desc' } },
+        }),
+        prisma.$queryRaw`
         SELECT TO_CHAR(date, 'YYYY-MM') AS month, COALESCE(SUM(total_cost), 0)::float AS fuel_cost
         FROM fuel_logs
         GROUP BY TO_CHAR(date, 'YYYY-MM')
         ORDER BY month DESC
         LIMIT 12
       `,
-      prisma.$queryRaw`
+        prisma.$queryRaw`
         SELECT TO_CHAR(date, 'YYYY-MM') AS month, COALESCE(SUM(amount), 0)::float AS expense_cost
         FROM expenses
         GROUP BY TO_CHAR(date, 'YYYY-MM')
         ORDER BY month DESC
         LIMIT 12
       `,
-      prisma.fuelLog.aggregate({ _sum: { totalCost: true } }),
-      prisma.expense.aggregate({ _sum: { amount: true } }),
-    ]);
+        prisma.fuelLog.aggregate({ _sum: { totalCost: true } }),
+        prisma.expense.aggregate({ _sum: { amount: true } }),
+      ]);
 
     const totalFuelCost = totalFuel._sum.totalCost || 0;
     const totalExpenseCost = totalExpense._sum.amount || 0;

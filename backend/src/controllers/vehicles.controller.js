@@ -12,12 +12,19 @@ const createVehicleSchema = z.object({
   registrationNumber: z.string().min(1).max(20),
   make: z.string().min(1).max(50),
   model: z.string().min(1).max(50),
-  year: z.number().int().min(1980).max(new Date().getFullYear() + 1),
+  year: z
+    .number()
+    .int()
+    .min(1980)
+    .max(new Date().getFullYear() + 1),
   type: z.enum(['VAN', 'TRUCK', 'BUS', 'CAR', 'BIKE']),
   fuelType: z.enum(['DIESEL', 'PETROL', 'CNG', 'ELECTRIC']),
   tankCapacity: z.number().positive(),
   currentOdometer: z.number().min(0).optional().default(0),
-  status: z.enum(['AVAILABLE', 'ON_TRIP', 'IN_SHOP', 'MAINTENANCE', 'RETIRED']).optional().default('AVAILABLE'),
+  status: z
+    .enum(['AVAILABLE', 'ON_TRIP', 'IN_SHOP', 'MAINTENANCE', 'RETIRED'])
+    .optional()
+    .default('AVAILABLE'),
   maximumLoadCapacity: z.number().positive().optional().nullable(),
   acquisitionCost: z.number().positive().optional().nullable(),
   region: z.string().max(100).optional().nullable(),
@@ -33,7 +40,12 @@ const updateVehicleSchema = z.object({
   registrationNumber: z.string().min(1).max(20).optional(),
   make: z.string().min(1).max(50).optional(),
   model: z.string().min(1).max(50).optional(),
-  year: z.number().int().min(1980).max(new Date().getFullYear() + 1).optional(),
+  year: z
+    .number()
+    .int()
+    .min(1980)
+    .max(new Date().getFullYear() + 1)
+    .optional(),
   type: z.enum(['VAN', 'TRUCK', 'BUS', 'CAR', 'BIKE']).optional(),
   fuelType: z.enum(['DIESEL', 'PETROL', 'CNG', 'ELECTRIC']).optional(),
   tankCapacity: z.number().positive().optional(),
@@ -61,8 +73,12 @@ async function listVehicles(req, res, next) {
     const { page, limit, skip } = parsePagination(req.query);
 
     const where = {};
-    if (req.query.status) { where.status = req.query.status; }
-    if (req.query.type) { where.type = req.query.type; }
+    if (req.query.status) {
+      where.status = req.query.status;
+    }
+    if (req.query.type) {
+      where.type = req.query.type;
+    }
     if (req.query.search) {
       where.OR = [
         { registrationNumber: { contains: req.query.search, mode: 'insensitive' } },

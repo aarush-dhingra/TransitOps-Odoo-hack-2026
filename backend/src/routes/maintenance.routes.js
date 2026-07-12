@@ -22,7 +22,13 @@ const FM = 'FLEET_MANAGER';
 
 // Schedule routes must come before /:id to avoid param collision
 router.get('/schedules/:vehicleId', verifyToken, requireRole(FM), listSchedulesByVehicle);
-router.post('/schedules', verifyToken, requireRole(FM), validate(createScheduleSchema), createSchedule);
+router.post(
+  '/schedules',
+  verifyToken,
+  requireRole(FM),
+  validate(createScheduleSchema),
+  createSchedule
+);
 
 router.get('/', verifyToken, requireRole(FM), listLogs);
 router.post('/', verifyToken, requireRole(FM), validate(createLogSchema), createLog);

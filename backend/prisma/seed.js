@@ -12,6 +12,17 @@ async function main() {
 
   // ─── ERP Users ─────────────────────────────────────────────────────────────
 
+  const adminUser = await prisma.user.upsert({
+    where: { email: 'admin@gmail.com' },
+    update: {},
+    create: {
+      name: 'Administrator',
+      email: 'admin@gmail.com',
+      passwordHash: await bcrypt.hash('12345678', HASH_ROUNDS),
+      role: 'ADMIN',
+    },
+  });
+
   const fleetManager = await prisma.user.upsert({
     where: { email: 'fleet@transitops.dev' },
     update: {},
@@ -190,7 +201,7 @@ async function main() {
   console.log('   driver1@transitops.dev   / password123  (Driver portal)');
 
   // suppress unused-var warnings – IDs may be needed for manual testing
-  void [fleetManager, dispatcher, safetyOfficer, financialAnalyst, van1, bus1, driver2];
+  void [adminUser, fleetManager, dispatcher, safetyOfficer, financialAnalyst, van1, bus1, driver2];
 }
 
 main()

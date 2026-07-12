@@ -24,10 +24,9 @@ const createDriverSchema = z
     portalEmail: z.string().email().optional(),
     portalPassword: z.string().min(8).optional(),
   })
-  .refine(
-    (data) => !data.createPortalAccess || (data.portalEmail && data.portalPassword),
-    { message: 'portalEmail and portalPassword are required when createPortalAccess is true.' }
-  );
+  .refine((data) => !data.createPortalAccess || (data.portalEmail && data.portalPassword), {
+    message: 'portalEmail and portalPassword are required when createPortalAccess is true.',
+  });
 
 const patchDriverStatusSchema = z.object({
   status: z.enum(['AVAILABLE', 'ON_TRIP', 'OFF_DUTY', 'ON_LEAVE', 'SUSPENDED']),
@@ -75,7 +74,9 @@ async function listDrivers(req, res, next) {
     const { page, limit, skip } = parsePagination(req.query);
 
     const where = {};
-    if (req.query.status) { where.status = req.query.status; }
+    if (req.query.status) {
+      where.status = req.query.status;
+    }
     if (req.query.search) {
       where.OR = [
         { name: { contains: req.query.search, mode: 'insensitive' } },
@@ -170,7 +171,11 @@ async function createDriver(req, res, next) {
       action: 'DRIVER_CREATED',
       entityType: 'DRIVER',
       entityId: driver.id,
-      details: { name: driver.name, licenseNumber: driver.licenseNumber, portalAccess: createPortalAccess },
+      details: {
+        name: driver.name,
+        licenseNumber: driver.licenseNumber,
+        portalAccess: createPortalAccess,
+      },
     });
 
     return success(res, driver, 201);
@@ -263,11 +268,21 @@ async function patchDriverStatus(req, res, next) {
     }
 
     if (driver.status === 'ON_TRIP' && status !== 'ON_TRIP') {
-      return error(res, 'CONFLICT', 'Cannot change status of a driver who is currently on a trip.', 409);
+      return error(
+        res,
+        'CONFLICT',
+        'Cannot change status of a driver who is currently on a trip.',
+        409
+      );
     }
 
     if (status === 'AVAILABLE' && driver.licenseExpiry <= new Date()) {
-      return error(res, 'VALIDATION_ERROR', 'Cannot set driver to AVAILABLE with an expired license.', 422);
+      return error(
+        res,
+        'VALIDATION_ERROR',
+        'Cannot set driver to AVAILABLE with an expired license.',
+        422
+      );
     }
 
     const updateData = { status };
@@ -286,7 +301,11 @@ async function patchDriverStatus(req, res, next) {
       action: `DRIVER_STATUS_CHANGED`,
       entityType: 'DRIVER',
       entityId: driver.id,
-      details: { previousStatus: driver.status, newStatus: status, safetyScore: updated.safetyScore },
+      details: {
+        previousStatus: driver.status,
+        newStatus: status,
+        safetyScore: updated.safetyScore,
+      },
     });
 
     return success(res, updated);
@@ -348,7 +367,12 @@ async function reinstateDriver(req, res, next) {
     }
 
     if (driver.licenseExpiry <= new Date()) {
-      return error(res, 'VALIDATION_ERROR', 'Cannot reinstate driver with an expired license.', 422);
+      return error(
+        res,
+        'VALIDATION_ERROR',
+        'Cannot reinstate driver with an expired license.',
+        422
+      );
     }
 
     const updated = await prisma.driver.update({

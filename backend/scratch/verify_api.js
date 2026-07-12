@@ -23,7 +23,10 @@ async function runTests() {
     }
 
     const res = await fetch(`http://localhost:3001/api${path}`, options);
-    const data = await res.json();
+    let data = null;
+    if (res.status !== 204) {
+      data = await res.json();
+    }
     return { status: res.status, data };
   };
 
@@ -73,6 +76,55 @@ async function runTests() {
   const financeToken = financeLogin.data.data.token;
   console.log('Financial Analyst login success');
 
+  const adminLogin = await req('/auth/login', 'POST', {
+    email: 'admin@gmail.com',
+    password: '12345678',
+  });
+  if (adminLogin.status !== 200 || !adminLogin.data.success) {
+    throw new Error('Failed to log in as Admin');
+  }
+  const adminToken = adminLogin.data.data.token;
+  console.log('Admin login success');
+
+  const adminGetUsers = await req('/admin/users', 'GET', null, adminToken);
+  if (adminGetUsers.status !== 200 || !adminGetUsers.data.success) {
+    throw new Error('Admin failed to get users');
+  }
+  console.log('Admin get users success');
+
+  const createEmployeeRes = await req('/admin/users', 'POST', {
+    name: 'Created Employee',
+    email: 'created_emp@transitops.dev',
+    password: 'password123',
+    role: 'DISPATCHER',
+  }, adminToken);
+  if (createEmployeeRes.status !== 201 || !createEmployeeRes.data.success) {
+    throw new Error('Admin failed to create employee');
+  }
+  const createdEmpId = createEmployeeRes.data.data.id;
+  console.log('Admin create employee success');
+
+  const empLogin = await req('/auth/login', 'POST', {
+    email: 'created_emp@transitops.dev',
+    password: 'password123',
+  });
+  if (empLogin.status !== 200 || !empLogin.data.success) {
+    throw new Error('Created employee failed to log in');
+  }
+  console.log('Created employee login success');
+
+  const deleteEmpRes = await req(`/admin/users/${createdEmpId}`, 'DELETE', null, adminToken);
+  if (deleteEmpRes.status !== 204) {
+    throw new Error('Admin failed to delete employee');
+  }
+  console.log('Admin delete employee success');
+
+  const adminGetTripsRes = await req('/trips', 'GET', null, adminToken);
+  if (adminGetTripsRes.status !== 200 || !adminGetTripsRes.data.success) {
+    throw new Error('Admin failed to access trips endpoint');
+  }
+  console.log('Admin access trips success');
+
   const truck = await prisma.vehicle.findFirst({ where: { registrationNumber: 'MH-12-AB-1234' } });
   const driverRecord = await prisma.driver.findFirst({ where: { id: driverId } });
 
@@ -114,7 +166,7 @@ async function runTests() {
   const tripId2 = createTrip2Res.data.data.id;
   console.log('Created trip 2 (double booking is allowed when PENDING)');
 
-  const getTripsRes = await req(`/trips?status=PENDING&vehicleId=${truck.id}`, 'GET', null, dispatcherToken);
+  const getTripsRes = await req(`/trips?status=DRAFT&vehicleId=${truck.id}`, 'GET', null, dispatcherToken);
   if (getTripsRes.status !== 200 || getTripsRes.data.data.length < 2) {
     throw new Error('Failed to query trips with filters');
   }
@@ -234,15 +286,15 @@ async function runTests() {
   console.log('Created expense with amount:', createExpenseRes.data.data.amount);
 
   console.log('\n--- 6. Analytics ---');
-  const fleetAnalyticsRes = await req('/analytics/fleet', 'GET', null, fleetManagerToken);
-  if (fleetAnalyticsRes.status !== 200 || !fleetAnalyticsRes.data.data.trips) {
-    throw new Error(`Failed to query fleet analytics: ${JSON.stringify(fleetAnalyticsRes.data)}`);
+  const fleetAnalyticsRes = await req('/analytics/dashboard', 'GET', null, fleetManagerToken);
+  if (fleetAnalyticsRes.status !== 200 || !fleetAnalyticsRes.data.data.vehicles) {
+    throw new Error(`Failed to query fleet dashboard analytics: ${JSON.stringify(fleetAnalyticsRes.data)}`);
   }
   console.log('Fleet Analytics response:', JSON.stringify(fleetAnalyticsRes.data.data));
 
-  const expenseAnalyticsRes = await req('/analytics/expenses', 'GET', null, financeToken);
-  if (expenseAnalyticsRes.status !== 200 || !expenseAnalyticsRes.data.data.totalSpendByMonth) {
-    throw new Error(`Failed to query expense analytics: ${JSON.stringify(expenseAnalyticsRes.data)}`);
+  const expenseAnalyticsRes = await req('/analytics/costs', 'GET', null, financeToken);
+  if (expenseAnalyticsRes.status !== 200 || !expenseAnalyticsRes.data.data.summary) {
+    throw new Error(`Failed to query expense costs analytics: ${JSON.stringify(expenseAnalyticsRes.data)}`);
   }
   console.log('Expense Analytics response:', JSON.stringify(expenseAnalyticsRes.data.data));
 

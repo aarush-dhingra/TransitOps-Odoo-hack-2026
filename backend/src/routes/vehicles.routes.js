@@ -25,7 +25,13 @@ router.get('/', verifyToken, requireRole(FM, DISP), listVehicles);
 router.post('/', verifyToken, requireRole(FM), validate(createVehicleSchema), createVehicle);
 router.get('/:id', verifyToken, requireRole(FM, DISP), getVehicle);
 router.put('/:id', verifyToken, requireRole(FM), validate(updateVehicleSchema), updateVehicle);
-router.patch('/:id/status', verifyToken, requireRole(FM), validate(patchVehicleStatusSchema), patchVehicleStatus);
+router.patch(
+  '/:id/status',
+  verifyToken,
+  requireRole(FM),
+  validate(patchVehicleStatusSchema),
+  patchVehicleStatus
+);
 router.delete('/:id', verifyToken, requireRole(FM), deleteVehicle);
 
 module.exports = router;
