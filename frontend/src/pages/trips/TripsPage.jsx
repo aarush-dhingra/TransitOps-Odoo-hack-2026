@@ -1,18 +1,23 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Plus, X, AlertTriangle, ArrowRight } from 'lucide-react';
-import { getTrips, createTrip, dispatchTrip, completeTrip, cancelTrip } from '../../api/trips';
+import { Plus, X, AlertTriangle, ArrowRight, Clock, Truck, User } from 'lucide-react';
+import { getTrips, createTrip, dispatchTrip, startTrip, completeTrip, cancelTrip } from '../../api/trips';
 import { getVehicles } from '../../api/vehicles';
 import { getDrivers } from '../../api/drivers';
 import StatusBadge from '../../components/shared/StatusBadge';
 import PageHeader from '../../components/shared/PageHeader';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import EmptyState from '../../components/shared/EmptyState';
+import ConfirmDialog from '../../components/shared/ConfirmDialog';
+import OdometerModal from '../../components/shared/OdometerModal';
 import AddressAutocomplete from '../../components/shared/AddressAutocomplete';
 import { formatDateTime } from '../../lib/utils';
 import { toast } from 'sonner';
 import { usePermissions } from '../../hooks/useAuth';
+import { useSearch } from '../../context/SearchContext';
+import { cn } from '../../lib/utils';
 
-const LIFECYCLE = ['DRAFT', 'DISPATCHED', 'ACTIVE', 'COMPLETED', 'CANCELLED'];
+const LIFECYCLE = ['DRAFT', 'DISPATCHED', 'ACTIVE', 'COMPLETED'];
+const LIFECYCLE_LABELS = { DRAFT: 'Draft', DISPATCHED: 'Assigned', ACTIVE: 'En Route', COMPLETED: 'Completed' };
 
 const EMPTY_FORM = {
   originAddress:      '',
@@ -23,65 +28,115 @@ const EMPTY_FORM = {
   destinationLng:     '',
   vehicleId:          '',
   driverId:           '',
-  plannedDeparture:   '',
+  departureDate:      '',
+  departureTime:      '09:00',
   cargoWeight:        '',
   distanceKm:         '',
   notes:              '',
 };
 
+function TripStepper({ status }) {
+  if (status === 'CANCELLED') {
+    return (
+      <div className="flex items-center gap-1 mt-2">
+        <span className="w-2 h-2 rounded-full bg-red-400" />
+        <span className="text-[11px] text-red-400 font-medium">Cancelled</span>
+      </div>
+    );
+  }
+
+  const currentIdx = LIFECYCLE.indexOf(status);
+
+  return (
+    <div className="flex items-center gap-0.5 mt-2">
+      {LIFECYCLE.map((step, i) => {
+        const done    = i < currentIdx;
+        const current = i === currentIdx;
+        return (
+          <div key={step} className="flex items-center">
+            <div
+              title={LIFECYCLE_LABELS[step]}
+              className={cn(
+                'w-2 h-2 rounded-full transition-all',
+                current ? 'bg-amber-400 ring-2 ring-amber-400/30 scale-125' :
+                done    ? 'bg-emerald-500' :
+                'bg-slate-700'
+              )}
+            />
+            {i < LIFECYCLE.length - 1 && (
+              <div className={cn('w-4 h-px mx-0.5 transition-colors', done ? 'bg-emerald-500/60' : 'bg-slate-700')} />
+            )}
+          </div>
+        );
+      })}
+      <span className="ml-1.5 text-[10px] text-slate-500">{LIFECYCLE_LABELS[status] ?? status}</span>
+    </div>
+  );
+}
+
 export default function TripsPage() {
   const { canWrite } = usePermissions();
   const canEditTrips = canWrite('trips');
+  const { query } = useSearch();
+
   const [trips,      setTrips]      = useState([]);
   const [vehicles,   setVehicles]   = useState([]);
   const [drivers,    setDrivers]    = useState([]);
   const [loading,    setLoading]    = useState(true);
   const [error,      setError]      = useState('');
-  const [statusFilter, setFilter]  = useState('');
+  const [statusFilter, setFilter]   = useState('');
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [form,       setForm]       = useState(EMPTY_FORM);
   const [saving,     setSaving]     = useState(false);
 
-  // Format current datetime for datetime-local min attribute
-  const now = new Date();
-  const todayDateTime = new Date(now.getTime() - now.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
+  // Modals
+  const [odometerTarget, setOdometerTarget] = useState(null);
+  const [cancelTarget,   setCancelTarget]   = useState(null);
 
-  // Capacity validation
-  const selectedVehicle = vehicles.find((v) => v.id === form.vehicleId);
-  const cargo           = parseFloat(form.cargoWeight) || 0;
-  const capacity = selectedVehicle?.maximumLoadCapacity ?? null;
+  const todayStr = new Date().toISOString().split('T')[0];
+
+  const selectedVehicle  = vehicles.find((v) => v.id === form.vehicleId);
+  const cargo            = parseFloat(form.cargoWeight) || 0;
+  const capacity         = selectedVehicle?.maximumLoadCapacity ?? null;
   const capacityExceeded = capacity !== null && cargo > capacity;
+  const capacityOverBy   = capacityExceeded ? cargo - capacity : 0;
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
       const params = statusFilter ? { status: statusFilter } : {};
+      // Only fetch vehicles/drivers for roles that can write trips (and therefore dispatch)
       const [tripRes, vRes, dRes] = await Promise.all([
-        getTrips(params),
-        getVehicles({ status: 'AVAILABLE' }),
-        getDrivers({ status: 'AVAILABLE' }),
+        getTrips({ limit: 100, ...params }),
+        canEditTrips ? getVehicles({ status: 'AVAILABLE' }) : Promise.resolve({ data: { data: [] } }),
+        canEditTrips ? getDrivers({ status: 'AVAILABLE' })  : Promise.resolve({ data: { data: [] } }),
       ]);
-      setTrips(tripRes.data.data   ?? []);
-      setVehicles(vRes.data.data   ?? []);
-      setDrivers(dRes.data.data    ?? []);
+      setTrips(tripRes.data.data ?? []);
+      setVehicles(vRes.data.data ?? []);
+      setDrivers(dRes.data.data ?? []);
     } catch {
       setError('Failed to load trips.');
     } finally {
       setLoading(false);
     }
-  }, [statusFilter]);
+  }, [statusFilter, canEditTrips]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
-    if ([form.originLat, form.originLng, form.destinationLat, form.destinationLng].some((value) => value === '')) {
+    if (!form.originLat || !form.destinationLat) {
       toast.error('Select a valid source and destination from the suggestions.');
+      return;
+    }
+    if (!form.departureDate || !form.departureTime) {
+      toast.error('Please set a planned departure date and time.');
       return;
     }
     setSaving(true);
     try {
+      const plannedDeparture = new Date(`${form.departureDate}T${form.departureTime}:00`).toISOString();
       const payload = {
         originAddress:      form.originAddress,
         originLat:          Number(form.originLat),
@@ -89,15 +144,19 @@ export default function TripsPage() {
         destinationAddress: form.destinationAddress,
         destinationLat:     Number(form.destinationLat),
         destinationLng:     Number(form.destinationLng),
-        vehicleId:          form.vehicleId,
-        driverId:           form.driverId,
-        plannedDeparture:   new Date(form.plannedDeparture).toISOString(),
+        vehicleId:          form.vehicleId || undefined,
+        driverId:           form.driverId  || undefined,
+        plannedDeparture,
         cargoWeight:        form.cargoWeight ? Number(form.cargoWeight) : undefined,
-        distanceKm:         parseFloat(form.distanceKm) || undefined,
-        notes:              form.notes || undefined,
+        distanceKm:         form.distanceKm  ? Number(form.distanceKm)  : undefined,
+        notes:              form.notes       || undefined,
       };
       await createTrip(payload);
-      toast.success('Trip created.');
+      const label = [
+        form.vehicleId ? '' : 'No vehicle yet',
+        form.driverId  ? '' : 'No driver yet',
+      ].filter(Boolean).join(', ');
+      toast.success(`Trip created as Draft.${label ? ` (${label})` : ''}`);
       setDrawerOpen(false);
       setForm(EMPTY_FORM);
       fetchAll();
@@ -108,249 +167,377 @@ export default function TripsPage() {
     }
   };
 
-  const handleDispatch = async (id) => {
+  const handleDispatch = async (trip) => {
+    if (!trip.vehicleId || !trip.driverId) {
+      toast.error('Assign a vehicle and driver before dispatching.');
+      return;
+    }
     try {
-      await dispatchTrip(id);
-      toast.success('Trip dispatched.');
+      await dispatchTrip(trip.id);
+      const vNum  = trip.vehicle?.registrationNumber ?? 'vehicle';
+      const dName = trip.driver?.name ?? 'driver';
+      toast.success(`${vNum} dispatched — ${dName} is now On Trip.`);
       fetchAll();
     } catch (err) {
       toast.error(err.response?.data?.error?.message ?? 'Failed to dispatch.');
     }
   };
 
-  const handleComplete = async (id) => {
-    const endOdometer = prompt('Enter end odometer reading (km):');
-    if (endOdometer === null) return;
+  const handleStart = async (trip) => {
     try {
-      await completeTrip(id, { endOdometer: parseFloat(endOdometer) });
-      toast.success('Trip completed.');
+      await startTrip(trip.id);
+      const vNum = trip.vehicle?.registrationNumber ?? 'Vehicle';
+      toast.success(`${vNum} is now en route — departure logged.`);
+      fetchAll();
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message ?? 'Failed to mark departure.');
+    }
+  };
+
+  const handleComplete = async (endOdometer) => {
+    if (!odometerTarget) return;
+    try {
+      await completeTrip(odometerTarget.id, { endOdometer });
+      toast.success(`Trip ${odometerTarget.tripNumber} completed — vehicle and driver now Available.`);
       fetchAll();
     } catch (err) {
       toast.error(err.response?.data?.error?.message ?? 'Failed to complete trip.');
+    } finally {
+      setOdometerTarget(null);
     }
   };
 
-  const handleCancel = async (id) => {
-    if (!window.confirm('Cancel this trip?')) return;
+  const handleCancel = async () => {
+    if (!cancelTarget) return;
     try {
-      await cancelTrip(id);
-      toast.success('Trip cancelled.');
+      await cancelTrip(cancelTarget.id);
+      toast.success(`Trip ${cancelTarget.tripNumber} cancelled.`);
       fetchAll();
     } catch (err) {
       toast.error(err.response?.data?.error?.message ?? 'Failed to cancel trip.');
+    } finally {
+      setCancelTarget(null);
     }
   };
 
+  const q = query.toLowerCase();
+  const displayed = trips.filter(t =>
+    !q ||
+    (t.tripNumber ?? '').toLowerCase().includes(q) ||
+    (t.originAddress ?? '').toLowerCase().includes(q) ||
+    (t.destinationAddress ?? '').toLowerCase().includes(q) ||
+    (t.vehicle?.registrationNumber ?? '').toLowerCase().includes(q) ||
+    (t.driver?.name ?? '').toLowerCase().includes(q)
+  );
+
+  const STATUS_FILTERS = [
+    { value: '',           label: 'All' },
+    { value: 'DRAFT',      label: 'Draft' },
+    { value: 'DISPATCHED', label: 'Assigned' },
+    { value: 'ACTIVE',     label: 'En Route' },
+    { value: 'COMPLETED',  label: 'Completed' },
+    { value: 'CANCELLED',  label: 'Cancelled' },
+  ];
+  const STATUS_PILL_COLORS = {
+    '':         'bg-white/8 text-slate-300 border border-white/10',
+    DRAFT:      'bg-slate-500/20 text-slate-300 border border-slate-500/30',
+    DISPATCHED: 'bg-blue-500/20 text-blue-300 border border-blue-500/30',
+    ACTIVE:     'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30',
+    COMPLETED:  'bg-emerald-600/20 text-emerald-200 border border-emerald-600/30',
+    CANCELLED:  'bg-red-500/20 text-red-300 border border-red-500/30',
+  };
+
+  const inputCls = 'w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500/40 transition-all';
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-5 pb-10">
       <PageHeader
         title="Trip Dispatcher"
         subtitle="Create and manage trips across the fleet"
         action={canEditTrips ? (
-          <button onClick={() => setDrawerOpen(true)} className="flex items-center gap-2 bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold px-4 py-2 rounded-md text-sm transition-colors">
+          <button onClick={() => setDrawerOpen(true)} className="flex items-center gap-2 btn-amber">
             <Plus className="w-4 h-4" /> New Trip
           </button>
         ) : null}
       />
 
-      {/* Status filter */}
+      {/* Status filter pills */}
       <div className="flex flex-wrap gap-2">
-        {['', 'DRAFT', 'DISPATCHED', 'ACTIVE', 'COMPLETED', 'CANCELLED'].map((s) => (
+        {STATUS_FILTERS.map(({ value, label }) => (
           <button
-            key={s}
-            onClick={() => setFilter(s)}
-            className={`px-3 py-1 rounded-md text-xs font-medium transition-colors ${statusFilter === s ? 'bg-amber-500 text-slate-900' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}
+            key={value}
+            onClick={() => setFilter(value)}
+            className={cn(
+              'px-3 py-1.5 rounded-full text-xs font-semibold transition-all',
+              statusFilter === value
+                ? 'bg-amber-500 text-slate-900 shadow-[0_2px_8px_rgba(245,158,11,0.35)]'
+                : STATUS_PILL_COLORS[value]
+            )}
           >
-            {s || 'All'}
+            {label}
           </button>
         ))}
       </div>
 
-      {/* Live board */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
-        <div className="xl:col-span-2">
-          {loading ? (
-            <LoadingSpinner />
-          ) : error ? (
-            <EmptyState type="error" title="Could not load trips" message={error}
-              action={<button onClick={fetchAll} className="text-sm text-amber-400 hover:underline">Retry</button>} />
-          ) : trips.length === 0 ? (
-            <EmptyState title="No trips found" message="Create a new trip to get started." />
-          ) : (
-            <div className="bg-slate-900 rounded-xl border border-slate-800 overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-800">
-                <h2 className="text-sm font-semibold text-white">Live Board</h2>
-              </div>
-              <div className="divide-y divide-slate-800">
-                {trips.map((t) => (
-                  <div key={t.id} className="px-5 py-4 hover:bg-slate-800/40 transition-colors">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="font-mono text-xs text-slate-500">{t.tripNumber}</span>
-                          <StatusBadge status={t.status} />
-                        </div>
-                        <p className="text-sm text-slate-200 flex items-center gap-1.5">
-                          {t.originAddress}
-                          <ArrowRight className="w-3 h-3 text-slate-500 shrink-0" />
-                          {t.destinationAddress}
-                        </p>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          {t.vehicle?.registrationNumber ?? 'Unassigned'} / {t.driver?.name ?? 'No driver'}
-                          {t.distanceKm && ` · ${t.distanceKm} km`}
-                        </p>
-                        <p className="text-xs text-slate-600 mt-0.5">{formatDateTime(t.plannedDeparture)}</p>
+      {/* Live Board */}
+      {loading ? (
+        <LoadingSpinner />
+      ) : error ? (
+        <EmptyState type="error" title="Could not load trips" message={error}
+          action={<button onClick={fetchAll} className="text-sm text-amber-400 hover:underline">Retry</button>} />
+      ) : displayed.length === 0 ? (
+        <EmptyState title="No trips found"
+          message={query ? 'No results match your search.' : 'Create a new trip to get started.'} />
+      ) : (
+        <div className="devpulse-panel overflow-hidden">
+          <div className="px-5 py-4 border-b border-[#222] flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-white">Live Board</h2>
+              <p className="text-[11px] text-[#666] mt-0.5">{displayed.length} trip{displayed.length !== 1 ? 's' : ''}</p>
+            </div>
+          </div>
+          <div className="divide-y divide-[#1a1a1a]">
+            {displayed.map((t) => {
+              const noVehicle = !t.vehicleId;
+              const noDriver  = !t.driverId;
+              const missingAssignment = noVehicle || noDriver;
+
+              return (
+                <div key={t.id} className="px-5 py-4 hover:bg-[#1a1a1a] transition-colors">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="min-w-0 flex-1">
+                      {/* Header row */}
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <span className="font-mono text-[11px] text-[#888]">{t.tripNumber}</span>
+                        <StatusBadge status={t.status} />
+                        {t.status === 'DRAFT' && noVehicle && (
+                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-slate-600/20 text-slate-500 border border-slate-600/30">
+                            Awaiting vehicle
+                          </span>
+                        )}
+                        {t.status === 'DRAFT' && !noVehicle && noDriver && (
+                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500/70 border border-amber-500/20">
+                            Awaiting driver
+                          </span>
+                        )}
+                        {t.status === 'ACTIVE' && (
+                          <span className="text-[11px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 animate-pulse">
+                            En Route
+                          </span>
+                        )}
                       </div>
 
-                      {canEditTrips && (
-                        <div className="flex flex-col gap-1.5 shrink-0">
-                          {t.status === 'DRAFT' && (
-                            <button onClick={() => handleDispatch(t.id)}
-                              className="px-3 py-1 bg-blue-500/20 text-blue-400 border border-blue-500/30 rounded text-xs font-medium hover:bg-blue-500/30 transition-colors">
-                              Dispatch
-                            </button>
-                          )}
-                          {(t.status === 'DISPATCHED' || t.status === 'ACTIVE') && (
-                            <button onClick={() => handleComplete(t.id)}
-                              className="px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded text-xs font-medium hover:bg-emerald-500/30 transition-colors">
-                              Complete
-                            </button>
-                          )}
-                          {(t.status === 'DRAFT' || t.status === 'DISPATCHED') && (
-                            <button onClick={() => handleCancel(t.id)}
-                              className="px-3 py-1 bg-red-500/20 text-red-400 border border-red-500/30 rounded text-xs font-medium hover:bg-red-500/30 transition-colors">
-                              Cancel
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>
+                      {/* Route */}
+                      <p className="text-sm text-slate-200 flex items-center gap-1.5 mb-1.5 flex-wrap">
+                        <span className="truncate max-w-[160px]">{t.originAddress?.split(',')[0]}</span>
+                        <ArrowRight className="w-3 h-3 text-slate-500 shrink-0" />
+                        <span className="truncate max-w-[160px]">{t.destinationAddress?.split(',')[0]}</span>
+                      </p>
 
-        {/* Lifecycle info */}
-        <div className="bg-slate-900 rounded-xl border border-slate-800 p-5 h-fit">
-          <h2 className="text-sm font-semibold text-white mb-4">Trip Lifecycle</h2>
-          <div className="flex flex-col gap-2">
-            {LIFECYCLE.map((s, i) => (
-              <div key={s} className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full shrink-0 ${
-                  s === 'COMPLETED' ? 'bg-emerald-400' :
-                  s === 'CANCELLED' ? 'bg-red-400' :
-                  s === 'ACTIVE'    ? 'bg-blue-400' :
-                  s === 'DISPATCHED'? 'bg-blue-400' :
-                  'bg-slate-500'
-                }`} />
-                <span className="text-xs text-slate-400">{s.charAt(0) + s.slice(1).toLowerCase()}</span>
-              </div>
-            ))}
+                      {/* Vehicle & Driver */}
+                      <div className="flex items-center gap-3 text-xs text-slate-500 mb-1 flex-wrap">
+                        <span className="flex items-center gap-1">
+                          <Truck className="w-3 h-3" />
+                          {t.vehicle?.registrationNumber
+                            ? <span className="text-slate-300">{t.vehicle.registrationNumber}</span>
+                            : <span className="text-amber-500/70 italic">Unassigned</span>
+                          }
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <User className="w-3 h-3" />
+                          {t.driver?.name
+                            ? <span className="text-slate-300">{t.driver.name}</span>
+                            : <span className="text-amber-500/70 italic">No driver</span>
+                          }
+                        </span>
+                        {t.distanceKm && (
+                          <span className="flex items-center gap-1">
+                            <Clock className="w-3 h-3" />
+                            {t.distanceKm} km
+                          </span>
+                        )}
+                      </div>
+
+                      <p className="text-[11px] text-[#666]">{formatDateTime(t.plannedDeparture)}</p>
+                      <TripStepper status={t.status} />
+                    </div>
+
+                    {/* Action buttons */}
+                    {canEditTrips && (
+                      <div className="flex flex-col gap-1.5 shrink-0 pt-1">
+                        {/* DRAFT: Dispatch (needs both vehicle & driver) */}
+                        {t.status === 'DRAFT' && (
+                          <button
+                            onClick={() => handleDispatch(t)}
+                            disabled={missingAssignment}
+                            title={missingAssignment ? 'Assign vehicle and driver first' : 'Dispatch this trip'}
+                            className={cn(
+                              'px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors border',
+                              missingAssignment
+                                ? 'bg-slate-700/20 text-slate-600 border-slate-700/30 cursor-not-allowed'
+                                : 'bg-blue-500/15 text-blue-400 border-blue-500/25 hover:bg-blue-500/25'
+                            )}
+                          >
+                            Dispatch
+                          </button>
+                        )}
+
+                        {/* DISPATCHED: Depart (moves to ACTIVE / En Route) */}
+                        {t.status === 'DISPATCHED' && (
+                          <button
+                            onClick={() => handleStart(t)}
+                            className="px-3 py-1.5 bg-amber-500/15 text-amber-400 border border-amber-500/25 rounded-lg text-xs font-semibold hover:bg-amber-500/25 transition-colors"
+                          >
+                            Depart
+                          </button>
+                        )}
+
+                        {/* ACTIVE: Complete trip (requires end odometer) */}
+                        {t.status === 'ACTIVE' && (
+                          <button
+                            onClick={() => setOdometerTarget({ id: t.id, tripNumber: t.tripNumber, startOdometer: t.startOdometer })}
+                            className="px-3 py-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 rounded-lg text-xs font-semibold hover:bg-emerald-500/25 transition-colors"
+                          >
+                            Complete
+                          </button>
+                        )}
+
+                        {/* Cancel — available for DRAFT, DISPATCHED, ACTIVE */}
+                        {(t.status === 'DRAFT' || t.status === 'DISPATCHED' || t.status === 'ACTIVE') && (
+                          <button
+                            onClick={() => setCancelTarget({ id: t.id, tripNumber: t.tripNumber })}
+                            className="px-3 py-1.5 bg-red-500/15 text-red-400 border border-red-500/25 rounded-lg text-xs font-semibold hover:bg-red-500/25 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <p className="text-xs text-slate-600 mt-4 leading-relaxed">
-            On Complete: odometer → fuel log → expenses → Vehicle & Driver available
-          </p>
         </div>
-      </div>
+      )}
+
+      {/* Odometer modal (ACTIVE → COMPLETED) */}
+      <OdometerModal
+        open={!!odometerTarget}
+        onOpenChange={(open) => !open && setOdometerTarget(null)}
+        tripNumber={odometerTarget?.tripNumber}
+        startOdometer={odometerTarget?.startOdometer}
+        onConfirm={handleComplete}
+      />
+
+      {/* Cancel confirm dialog */}
+      <ConfirmDialog
+        open={!!cancelTarget}
+        onOpenChange={(open) => !open && setCancelTarget(null)}
+        title="Cancel this trip?"
+        message={cancelTarget
+          ? `Trip ${cancelTarget.tripNumber} will be cancelled and any assigned vehicle/driver will be freed.`
+          : ''}
+        confirmLabel="Yes, cancel trip"
+        onConfirm={handleCancel}
+        destructive
+      />
 
       {/* Create Trip Drawer */}
       {drawerOpen && canEditTrips && (
         <div className="fixed inset-0 z-50 flex justify-end">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setDrawerOpen(false)} />
-          <div className="relative w-full max-w-md bg-slate-900 border-l border-slate-800 overflow-y-auto p-6 space-y-4">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setDrawerOpen(false)} />
+          <div className="relative w-full max-w-md glass-panel border-l border-white/5 overflow-y-auto p-6 space-y-4 animate-slide-in-right">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-semibold text-white">Create Trip</h2>
-              <button onClick={() => setDrawerOpen(false)} className="text-slate-400 hover:text-white">
+              <div>
+                <h2 className="text-base font-semibold text-white">Create Trip</h2>
+                <p className="text-xs text-slate-500 mt-0.5">Vehicle and driver can be assigned later</p>
+              </div>
+              <button onClick={() => setDrawerOpen(false)} className="text-slate-400 hover:text-white transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
 
             <form onSubmit={handleCreate} className="space-y-4">
               <AddressAutocomplete
-                label="Source / Origin"
+                label="Source / Origin *"
                 value={form.originAddress}
                 required
                 onChange={(originAddress) =>
-                  setForm((current) => ({ ...current, originAddress, originLat: '', originLng: '' }))
+                  setForm((c) => ({ ...c, originAddress, originLat: '', originLng: '' }))
                 }
-                onSelect={(location) =>
-                  setForm((current) => ({
-                    ...current,
-                    originAddress: location.label,
-                    originLat: location.latitude,
-                    originLng: location.longitude,
-                  }))
+                onSelect={(loc) =>
+                  setForm((c) => ({ ...c, originAddress: loc.label, originLat: loc.latitude, originLng: loc.longitude }))
                 }
               />
 
               <AddressAutocomplete
-                label="Destination"
+                label="Destination *"
                 value={form.destinationAddress}
                 required
                 onChange={(destinationAddress) =>
-                  setForm((current) => ({
-                    ...current,
-                    destinationAddress,
-                    destinationLat: '',
-                    destinationLng: '',
-                  }))
+                  setForm((c) => ({ ...c, destinationAddress, destinationLat: '', destinationLng: '' }))
                 }
-                onSelect={(location) =>
-                  setForm((current) => ({
-                    ...current,
-                    destinationAddress: location.label,
-                    destinationLat: location.latitude,
-                    destinationLng: location.longitude,
-                  }))
+                onSelect={(loc) =>
+                  setForm((c) => ({ ...c, destinationAddress: loc.label, destinationLat: loc.latitude, destinationLng: loc.longitude }))
                 }
               />
 
-              {[
-                { label: 'Planned Distance (km)',    key: 'distanceKm',         type: 'number', min: 0, step: 'any' },
-                { label: 'Planned Departure',        key: 'plannedDeparture',   type: 'datetime-local', required: true, min: todayDateTime },
-              ].map(({ label, key, type = 'text', required, min, step }) => (
-                <div key={key}>
-                  <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">{label}</label>
+              {/* Departure: date + time as two clean inputs */}
+              <div>
+                <label className="block text-xs text-slate-400 mb-1.5 uppercase tracking-wider">Planned Departure *</label>
+                <div className="flex gap-2">
                   <input
-                    type={type}
-                    required={required}
-                    min={min}
-                    step={step}
-                    value={form[key]}
-                    onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
+                    type="date"
+                    required
+                    min={todayStr}
+                    value={form.departureDate}
+                    onChange={(e) => setForm((f) => ({ ...f, departureDate: e.target.value }))}
+                    className={cn(inputCls, 'flex-1')}
+                  />
+                  <input
+                    type="time"
+                    required
+                    value={form.departureTime}
+                    onChange={(e) => setForm((f) => ({ ...f, departureTime: e.target.value }))}
+                    className={cn(inputCls, 'w-28 shrink-0')}
                   />
                 </div>
-              ))}
+              </div>
 
-              {/* Vehicle */}
+              {/* Distance */}
               <div>
-                <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Vehicle (Available Only)</label>
-                <select
-                  required
-                  value={form.vehicleId}
-                  onChange={(e) => setForm((f) => ({ ...f, vehicleId: e.target.value }))}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                >
-                  <option value="">Select vehicle…</option>
+                <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Distance (km)</label>
+                <input type="number" min="0" step="any" value={form.distanceKm}
+                  onChange={(e) => setForm((f) => ({ ...f, distanceKm: e.target.value }))}
+                  className={inputCls} placeholder="Optional" />
+              </div>
+
+              {/* Vehicle (optional) */}
+              <div>
+                <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">
+                  Vehicle <span className="text-slate-600 font-normal normal-case">(optional — assign later)</span>
+                </label>
+                <select value={form.vehicleId}
+                  onChange={(e) => setForm((f) => ({ ...f, vehicleId: e.target.value }))} className={inputCls}>
+                  <option value="">None — assign at dispatch</option>
                   {vehicles.map((v) => (
-                    <option key={v.id} value={v.id}>{v.registrationNumber} – {v.make} {v.model}</option>
+                    <option key={v.id} value={v.id}>
+                      {v.registrationNumber} – {v.make} {v.model}
+                      {v.maximumLoadCapacity ? ` (${v.maximumLoadCapacity} kg cap)` : ''}
+                    </option>
                   ))}
                 </select>
               </div>
 
-              {/* Driver */}
+              {/* Driver (optional) */}
               <div>
-                <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Driver (Available Only)</label>
-                <select
-                  required
-                  value={form.driverId}
-                  onChange={(e) => setForm((f) => ({ ...f, driverId: e.target.value }))}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                >
-                  <option value="">Select driver…</option>
+                <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">
+                  Driver <span className="text-slate-600 font-normal normal-case">(optional — assign later)</span>
+                </label>
+                <select value={form.driverId}
+                  onChange={(e) => setForm((f) => ({ ...f, driverId: e.target.value }))} className={inputCls}>
+                  <option value="">None — assign at dispatch</option>
                   {drivers.map((d) => (
                     <option key={d.id} value={d.id}>{d.name} ({d.licenseCategory})</option>
                   ))}
@@ -360,41 +547,42 @@ export default function TripsPage() {
               {/* Cargo weight */}
               <div>
                 <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Cargo Weight (kg)</label>
-                <input
-                  type="number"
-                  min="0"
-                  step="any"
-                  value={form.cargoWeight}
+                <input type="number" min="0" step="any" value={form.cargoWeight}
                   onChange={(e) => setForm((f) => ({ ...f, cargoWeight: e.target.value }))}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500"
-                />
+                  className={inputCls} placeholder="Optional" />
               </div>
+
+              {/* Capacity warning */}
+              {capacityExceeded && (
+                <div className="flex items-start gap-2.5 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
+                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-semibold text-red-400">Capacity exceeded — dispatch will be blocked</p>
+                    <p className="text-xs text-red-400/80 mt-0.5">
+                      Cargo is {capacityOverBy.toFixed(1)} kg over the {capacity} kg limit for {selectedVehicle?.registrationNumber}.
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Notes */}
               <div>
                 <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Notes</label>
-                <textarea
-                  rows={2}
-                  value={form.notes}
+                <textarea rows={2} value={form.notes}
                   onChange={(e) => setForm((f) => ({ ...f, notes: e.target.value }))}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-md text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-amber-500 resize-none"
-                />
+                  className={cn(inputCls, 'resize-none')} />
               </div>
-
-              {capacityExceeded && (
-                <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/30 rounded-md px-3 py-2.5">
-                  <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
-                  <p className="text-xs text-red-400">Cargo exceeds this vehicle's {capacity} kg maximum load - dispatch blocked</p>
-                </div>
-              )}
 
               <div className="flex gap-3 pt-2">
                 <button type="button" onClick={() => setDrawerOpen(false)}
-                  className="flex-1 py-2 rounded-md text-sm border border-slate-700 text-slate-300 hover:bg-slate-800 transition-colors">
+                  className="flex-1 py-2.5 rounded-xl text-sm border border-white/10 text-slate-300 hover:bg-white/5 transition-colors">
                   Cancel
                 </button>
-                <button type="submit" disabled={saving || capacityExceeded || !form.originLat || !form.destinationLat}
-                  className="flex-1 py-2 rounded-md text-sm bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                <button
+                  type="submit"
+                  disabled={saving || capacityExceeded || !form.originLat || !form.destinationLat}
+                  className="flex-1 py-2.5 rounded-xl text-sm btn-amber disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   {saving ? 'Creating…' : 'Create Trip'}
                 </button>
               </div>

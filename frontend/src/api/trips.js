@@ -15,5 +15,8 @@ export const dispatchTrip = (id) =>
 export const completeTrip = (id, data) =>
   api.patch(`/trips/${id}/complete`, data);
 
+export const startTrip = (id) =>
+  api.patch(`/trips/${id}/start`);
+
 export const cancelTrip = (id) =>
   api.patch(`/trips/${id}/cancel`);

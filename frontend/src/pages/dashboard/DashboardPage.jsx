@@ -1,119 +1,219 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Truck, CheckCircle, Wrench, Route, Clock, Users, Activity } from 'lucide-react';
 import {
-  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell,
-} from 'recharts';
+  Truck, CheckCircle, Wrench, Route, Clock,
+  Users, Activity, DollarSign, AlertTriangle, ShieldCheck,
+  TrendingUp, Fuel,
+} from 'lucide-react';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { getDashboardStats } from '../../api/analytics';
-import { getTrips } from '../../api/trips';
 import StatCard from '../../components/shared/StatCard';
 import StatusBadge from '../../components/shared/StatusBadge';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import EmptyState from '../../components/shared/EmptyState';
-import { formatDateTime } from '../../lib/utils';
-import { usePermissions } from '../../hooks/useAuth';
+import { formatDateTime, formatCurrency } from '../../lib/utils';
+import { useAuth } from '../../hooks/useAuth';
 
 const STATUS_COLORS = {
   AVAILABLE:   '#10b981',
   ON_TRIP:     '#3b82f6',
   MAINTENANCE: '#f59e0b',
+  IN_SHOP:     '#f59e0b',
   RETIRED:     '#ef4444',
 };
 
+const STATUS_LABELS = {
+  AVAILABLE:   'Available',
+  ON_TRIP:     'On Trip',
+  MAINTENANCE: 'In Shop',
+  IN_SHOP:     'In Shop',
+  RETIRED:     'Retired',
+};
+
+/** Returns the KPI card definitions relevant to a role */
+function getKpiCards(role, stats) {
+  const onTripVehicles  = count(stats?.vehicles?.byStatus, 'ON_TRIP');
+  const available       = count(stats?.vehicles?.byStatus, 'AVAILABLE');
+  const inMaintenance   = (count(stats?.vehicles?.byStatus, 'MAINTENANCE') + count(stats?.vehicles?.byStatus, 'IN_SHOP'));
+  const driversOnDuty   = stats?.drivers?.onDuty ?? 0;
+  const activeTrips     = stats?.trips?.active   ?? 0;
+  const completedTrips  = stats?.trips?.completed ?? 0;
+  const draftTrips      = stats?.trips?.pending   ?? 0;
+  const maintAlerts     = stats?.vehicles?.maintenanceDue ?? 0;
+  const fuelThisMonth   = stats?.costsThisMonth?.fuel      ?? 0;
+  const expThisMonth    = stats?.costsThisMonth?.expenses  ?? 0;
+  const totalThisMonth  = fuelThisMonth + expThisMonth;
+  const utilizationPct  = stats?.vehicles?.utilizationPct ?? 0;
+
+  switch (role) {
+    case 'FLEET_MANAGER':
+      return [
+        { label: 'Available Vehicles',  value: available,          accent: 'green',  icon: CheckCircle },
+        { label: 'On Trip',             value: onTripVehicles,     accent: 'blue',   icon: Truck },
+        { label: 'In Maintenance',      value: inMaintenance,      accent: 'amber',  icon: Wrench },
+        { label: 'Maintenance Alerts',  value: maintAlerts,        accent: 'red',    icon: AlertTriangle },
+        { label: 'Trips En Route',       value: activeTrips,        accent: 'blue',   icon: Route },
+        { label: 'Completed Trips',     value: completedTrips,     accent: 'slate',  icon: Clock },
+        { label: 'Drivers On Duty',     value: driversOnDuty,      accent: 'purple', icon: Users },
+        { label: 'Ops Cost (Month)',    value: formatCurrency(totalThisMonth), accent: 'amber', icon: DollarSign },
+      ];
+
+    case 'DISPATCHER':
+      return [
+        { label: 'Available Vehicles',  value: available,           accent: 'green',  icon: CheckCircle },
+        { label: 'On Trip',             value: onTripVehicles,      accent: 'blue',   icon: Truck },
+        { label: 'Draft Trips',         value: draftTrips,          accent: 'slate',  icon: Clock },
+        { label: 'Trips En Route',      value: activeTrips,         accent: 'blue',   icon: Activity },
+        { label: 'Completed Trips',     value: completedTrips,      accent: 'green',  icon: Route },
+        { label: 'Fleet Utilization',   value: `${utilizationPct}%`, accent: 'amber', icon: TrendingUp },
+      ];
+
+    case 'SAFETY_OFFICER':
+      return [
+        { label: 'Drivers On Duty',     value: driversOnDuty,       accent: 'blue',   icon: Users },
+        { label: 'Trips En Route',      value: activeTrips,         accent: 'amber',  icon: Route },
+        { label: 'Completed Trips',     value: completedTrips,      accent: 'green',  icon: CheckCircle },
+        { label: 'Maintenance Alerts',  value: maintAlerts,         accent: 'red',    icon: AlertTriangle },
+        { label: 'Fleet Utilization',   value: `${utilizationPct}%`, accent: 'slate', icon: ShieldCheck },
+      ];
+
+    case 'FINANCIAL_ANALYST':
+      return [
+        { label: 'Fuel Cost (Month)',   value: formatCurrency(fuelThisMonth),  accent: 'amber',  icon: Fuel },
+        { label: 'Other Expenses (Mo.)',value: formatCurrency(expThisMonth),   accent: 'blue',   icon: DollarSign },
+        { label: 'Total Ops (Month)',   value: formatCurrency(totalThisMonth), accent: 'red',    icon: TrendingUp },
+        { label: 'Completed Trips',     value: completedTrips,                 accent: 'green',  icon: CheckCircle },
+        { label: 'Trips En Route',      value: activeTrips,                    accent: 'slate',  icon: Route },
+      ];
+
+    default: // ADMIN
+      return [
+        { label: 'Available Vehicles',  value: available,      accent: 'green',  icon: CheckCircle },
+        { label: 'On Trip',             value: onTripVehicles, accent: 'blue',   icon: Truck },
+        { label: 'In Maintenance',      value: inMaintenance,  accent: 'amber',  icon: Wrench },
+        { label: 'Active Trips',        value: activeTrips,    accent: 'blue',   icon: Route },
+        { label: 'Completed Trips',     value: completedTrips, accent: 'slate',  icon: Clock },
+        { label: 'Drivers On Duty',     value: driversOnDuty,  accent: 'purple', icon: Users },
+        { label: 'Ops Cost (Month)',     value: formatCurrency(totalThisMonth), accent: 'amber', icon: DollarSign },
+      ];
+  }
+}
+
+function count(arr, status) {
+  return arr?.find(x => x.status === status)?.count ?? 0;
+}
+
+function DonutCenter({ cx, cy, pct }) {
+  return (
+    <>
+      <text x={cx} y={cy - 8}  textAnchor="middle" fill="#f59e0b" fontSize={26} fontWeight={700}>{pct}%</text>
+      <text x={cx} y={cy + 14} textAnchor="middle" fill="#94a3b8" fontSize={11}>Utilization</text>
+    </>
+  );
+}
+
 export default function DashboardPage() {
-  const { canRead } = usePermissions();
-  const canViewTrips = canRead('trips');
-  const [stats,     setStats]     = useState(null);
-  const [trips,     setTrips]     = useState([]);
-  const [loading,   setLoading]   = useState(true);
-  const [error,     setError]     = useState('');
+  const { user } = useAuth();
+  const role = user?.role;
+
+  const [stats,   setStats]   = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error,   setError]   = useState('');
 
   const fetchAll = useCallback(async () => {
     setLoading(true);
     setError('');
     try {
-      const [dashRes, tripRes] = await Promise.all([
-        getDashboardStats(),
-        canViewTrips ? getTrips({ status: 'ACTIVE' }) : Promise.resolve({ data: { data: [] } }),
-      ]);
-      setStats(dashRes.data.data);
-      setTrips(tripRes.data.data?.slice(0, 6) ?? []);
+      const res = await getDashboardStats();
+      setStats(res.data.data);
     } catch {
-      setError('Failed to load dashboard. Please try again.');
+      setError('Failed to load dashboard data.');
     } finally {
       setLoading(false);
     }
-  }, [canViewTrips]);
+  }, []);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
   if (loading) return <LoadingSpinner message="Loading dashboard…" />;
   if (error)   return (
-    <EmptyState
-      type="error"
-      title="Dashboard unavailable"
-      message={error}
-      action={<button onClick={fetchAll} className="btn-amber">Retry</button>}
-    />
+    <EmptyState type="error" title="Dashboard unavailable" message={error}
+      action={<button onClick={fetchAll} className="btn-amber">Retry</button>} />
   );
 
-  const getCount = (arr, status) => arr?.find(x => x.status === status)?.count || 0;
+  const kpiCards = getKpiCards(role, stats);
 
-  const availableVehicles = getCount(stats?.vehicles?.byStatus, 'AVAILABLE');
-  const onTripVehicles = getCount(stats?.vehicles?.byStatus, 'ON_TRIP');
-  const activeVehicles = availableVehicles + onTripVehicles;
-  const inMaintenance = getCount(stats?.vehicles?.byStatus, 'MAINTENANCE');
-  const driversOnDuty = getCount(stats?.drivers?.byStatus, 'ON_TRIP');
+  const vehicleStatusData = (stats?.vehicles?.byStatus ?? [])
+    .filter(g => g.count > 0)
+    .map(g => ({
+      name:  STATUS_LABELS[g.status] ?? g.status,
+      value: g.count,
+      color: STATUS_COLORS[g.status] ?? '#64748b',
+    }));
 
-  const vehicleStatusData = stats?.vehicles?.byStatus?.map(g => ({ name: g.status, value: g.count })) || [];
+  const utilizationPct = stats?.vehicles?.utilizationPct ?? 0;
+  const recentTrips    = stats?.recentTrips ?? [];
+
+  // Financial Analysts don't need the fleet donut since they can't access fleet
+  const showDonut = role !== 'FINANCIAL_ANALYST';
+  const colSpan   = showDonut ? 'xl:col-span-2' : 'xl:col-span-3';
+
+  const ROLE_GREETINGS = {
+    FLEET_MANAGER:     'Fleet Operations',
+    DISPATCHER:        'Dispatch Centre',
+    SAFETY_OFFICER:    'Safety Overview',
+    FINANCIAL_ANALYST: 'Financial Overview',
+    ADMIN:             'Platform Overview',
+  };
 
   return (
-    <div className="space-y-8 animate-fade-in pb-10">
-      <h1 className="text-2xl font-bold text-white tracking-tight">Dashboard Overview</h1>
-
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-4">
-        <StatCard label="Active Vehicles"       value={activeVehicles}       accent="blue"   icon={Truck} />
-        <StatCard label="Available Vehicles"    value={availableVehicles}    accent="green"  icon={CheckCircle} />
-        <StatCard label="In Maintenance"        value={inMaintenance}        accent="amber" icon={Wrench} />
-        <StatCard label="Active Trips"          value={stats?.trips?.active || 0} accent="blue"   icon={Route} />
-        <StatCard label="Completed Trips"       value={stats?.trips?.completed || 0} accent="slate"  icon={Clock} />
-        <StatCard label="Drivers on Duty"       value={driversOnDuty}        accent="purple" icon={Users} />
-        <StatCard
-          label="Maint. Alerts"
-          value={stats?.vehicles?.maintenanceDue || 0}
-          accent="red"
-          icon={Activity}
-        />
+    <div className="space-y-6 animate-fade-in pb-10">
+      <div>
+        <h1 className="text-2xl font-bold text-white tracking-tight">{ROLE_GREETINGS[role] ?? 'Dashboard'}</h1>
+        <p className="text-sm text-slate-500 mt-0.5">Welcome back, {user?.name} — live data as of now</p>
       </div>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      {/* Role-specific KPI strip */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3">
+        {kpiCards.map((card) => (
+          <StatCard key={card.label} {...card} />
+        ))}
+      </div>
+
+      {/* Main content */}
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-5">
         {/* Recent Trips */}
-        <div className="xl:col-span-2 devpulse-panel overflow-hidden">
-          <div className="px-6 py-4 border-b border-[#222]">
+        <div className={`${colSpan} devpulse-panel overflow-hidden`}>
+          <div className="px-5 py-4 border-b border-[#222] flex items-center justify-between">
             <h2 className="text-sm font-semibold text-white tracking-wide">Recent Trips</h2>
+            <span className="text-[10px] text-[#666] uppercase tracking-widest">Last 10</span>
           </div>
-          {trips.length === 0 ? (
-            <EmptyState title="No active trips" message="Trips will appear here once dispatched." />
+          {recentTrips.length === 0 ? (
+            <EmptyState title="No trips yet" message="Dispatched trips will appear here." />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="border-b border-[#222] text-[10px] text-[#666] uppercase tracking-widest bg-[#0a0a0a]">
-                    <th className="px-6 py-3 text-left font-bold">Trip</th>
-                    <th className="px-6 py-3 text-left font-bold">Vehicle</th>
-                    <th className="px-6 py-3 text-left font-bold">Driver</th>
-                    <th className="px-6 py-3 text-left font-bold">Status</th>
-                    <th className="px-6 py-3 text-left font-bold">Departure</th>
+                  <tr className="thead-row">
+                    <th className="px-5 py-3 text-left">Trip #</th>
+                    <th className="px-5 py-3 text-left">Vehicle</th>
+                    <th className="px-5 py-3 text-left">Driver</th>
+                    <th className="px-5 py-3 text-left">Route</th>
+                    <th className="px-5 py-3 text-left">Status</th>
+                    <th className="px-5 py-3 text-left">Departure</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-[#222]">
-                  {trips.map((t) => (
-                    <tr key={t.id} className="hover:bg-[#1a1a1a] transition-colors">
-                      <td className="px-6 py-4 font-mono text-[11px] text-[#888]">{t.tripNumber}</td>
-                      <td className="px-6 py-4 text-white text-sm font-medium">{t.vehicle?.registrationNumber ?? '—'}</td>
-                      <td className="px-6 py-4 text-zinc-300 text-sm">{t.driver?.name ?? '—'}</td>
-                      <td className="px-6 py-4"><StatusBadge status={t.status} /></td>
-                      <td className="px-6 py-4 text-[#888] text-xs">{formatDateTime(t.plannedDeparture)}</td>
+                <tbody className="divide-y divide-[#1a1a1a]">
+                  {recentTrips.map((t) => (
+                    <tr key={t.id} className="tbody-row">
+                      <td className="px-5 py-3 font-mono text-[11px] text-[#888]">{t.tripNumber}</td>
+                      <td className="px-5 py-3 text-white text-xs font-medium">{t.vehicle?.registrationNumber ?? '—'}</td>
+                      <td className="px-5 py-3 text-slate-300 text-xs">{t.driver?.name ?? '—'}</td>
+                      <td className="px-5 py-3 text-slate-400 text-xs max-w-[180px]">
+                        <span className="truncate block">{t.originAddress?.split(',')[0] ?? '—'}</span>
+                        <span className="text-[#666] text-[10px]">→ {t.destinationAddress?.split(',')[0] ?? '—'}</span>
+                      </td>
+                      <td className="px-5 py-3"><StatusBadge status={t.status} /></td>
+                      <td className="px-5 py-3 text-[#888] text-[11px] whitespace-nowrap">{formatDateTime(t.plannedDeparture)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -122,32 +222,51 @@ export default function DashboardPage() {
           )}
         </div>
 
-        {/* Vehicle Status Chart */}
-        <div className="devpulse-panel p-6">
-          <h2 className="text-sm font-semibold text-white mb-6 tracking-wide">Fleet Status</h2>
-          {vehicleStatusData.length === 0 ? (
-            <EmptyState title="No vehicle data" />
-          ) : (
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={vehicleStatusData} layout="vertical" barSize={14}>
-                <XAxis type="number" tick={{ fill: '#666', fontSize: 10 }} axisLine={{ stroke: '#222' }} tickLine={false} />
-                <YAxis type="category" dataKey="name" tick={{ fill: '#888', fontSize: 10, fontWeight: 600 }} axisLine={false} tickLine={false} width={85}
-                  tickFormatter={(v) => ({ AVAILABLE: 'Available', ON_TRIP: 'On Trip', MAINTENANCE: 'In Shop', RETIRED: 'Retired' }[v] ?? v)}
-                />
-                <Tooltip
-                  contentStyle={{ background: '#111', border: '1px solid #222', borderRadius: 8, fontSize: '12px' }}
-                  labelStyle={{ color: '#888', marginBottom: '4px' }}
-                  cursor={{ fill: '#1a1a1a' }}
-                />
-                <Bar dataKey="value" radius={[0, 4, 4, 0]}>
-                  {vehicleStatusData.map((entry) => (
-                    <Cell key={entry.name} fill={STATUS_COLORS[entry.name] ?? '#64748b'} />
+        {/* Fleet Status Donut — only for roles that can see fleet data */}
+        {showDonut && (
+          <div className="devpulse-panel p-5 flex flex-col">
+            <h2 className="text-sm font-semibold text-white mb-1 tracking-wide">Fleet Status</h2>
+            <p className="text-xs text-[#666] mb-4">Vehicle distribution</p>
+
+            {vehicleStatusData.length === 0 ? (
+              <EmptyState title="No vehicle data" />
+            ) : (
+              <div className="flex-1 flex flex-col items-center">
+                <ResponsiveContainer width="100%" height={200}>
+                  <PieChart>
+                    <Pie
+                      data={vehicleStatusData}
+                      cx="50%" cy="50%"
+                      innerRadius={58} outerRadius={80}
+                      paddingAngle={3}
+                      dataKey="value"
+                    >
+                      {vehicleStatusData.map((entry, i) => (
+                        <Cell key={i} fill={entry.color} stroke="transparent" />
+                      ))}
+                    </Pie>
+                    <Tooltip
+                      contentStyle={{ background: '#111', border: '1px solid #222', borderRadius: 8, fontSize: 12 }}
+                    />
+                    <DonutCenter cx="50%" cy="50%" pct={utilizationPct} />
+                  </PieChart>
+                </ResponsiveContainer>
+
+                <div className="w-full space-y-2 mt-2">
+                  {vehicleStatusData.map((d) => (
+                    <div key={d.name} className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2.5 h-2.5 rounded-full" style={{ background: d.color }} />
+                        <span className="text-xs text-slate-400">{d.name}</span>
+                      </div>
+                      <span className="text-xs font-semibold text-white tabular-nums">{d.value}</span>
+                    </div>
                   ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          )}
-        </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

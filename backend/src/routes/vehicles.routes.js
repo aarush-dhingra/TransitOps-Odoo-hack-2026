@@ -18,12 +18,13 @@ const validate = require('../middleware/validate');
 
 const router = Router();
 
-const FM = 'FLEET_MANAGER';
+const FM   = 'FLEET_MANAGER';
 const DISP = 'DISPATCHER';
+const FA   = 'FINANCIAL_ANALYST';   // needs read-only for fuel-log vehicle picker
 
-router.get('/', verifyToken, requireRole(FM, DISP), listVehicles);
+router.get('/', verifyToken, requireRole(FM, DISP, FA), listVehicles);
 router.post('/', verifyToken, requireRole(FM), validate(createVehicleSchema), createVehicle);
-router.get('/:id', verifyToken, requireRole(FM, DISP), getVehicle);
+router.get('/:id', verifyToken, requireRole(FM, DISP, FA), getVehicle);
 router.put('/:id', verifyToken, requireRole(FM), validate(updateVehicleSchema), updateVehicle);
 router.patch(
   '/:id/status',

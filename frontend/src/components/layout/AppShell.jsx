@@ -4,9 +4,9 @@ import Topbar from './Topbar';
 
 export default function AppShell() {
   return (
-    <div className="flex min-h-screen bg-transparent text-slate-100">
+    <div className="flex h-screen overflow-hidden bg-transparent text-slate-100">
       <Sidebar />
-      <div className="flex flex-col flex-1 min-w-0">
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
         <Topbar />
         <main className="flex-1 overflow-y-auto p-6">
           <Outlet />

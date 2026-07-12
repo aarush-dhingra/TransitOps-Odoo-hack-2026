@@ -28,16 +28,199 @@
 }
 
 @layer base {
-  * {
-    @apply border-border;
-  }
-  body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
-  }
+  * { @apply border-border; }
+  body { @apply bg-background text-foreground; font-feature-settings: "rlig" 1, "calt" 1; }
 }
 
-/* Leaflet map z-index fix inside dialogs */
+/* ─── Dark mode (default) ─────────────────────────────────────────── */
+body {
+  background-color: #0a0a0a;
+  background-image: radial-gradient(circle at top right, #111111, transparent 400px);
+  background-attachment: fixed;
+  color: #e2e8f0;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.10); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.20); }
+
+/* ─── Light mode palette ─────────────────────────────────────────── */
+/*
+  Page bg:     #eef1f8   (cool blue-tinted gray — depth, not white-white)
+  Sidebar:     #ffffff
+  Cards:       #ffffff   + subtle shadow
+  Table head:  #f4f6fb
+  Row hover:   #eef2ff   (indigo tint — distinguishable at a glance)
+  Borders:     #dde2ec
+  Text-h:      #111827
+  Text-body:   #374151
+  Text-muted:  #9ca3af
+*/
+
+html.light body {
+  background-color: #eef1f8;
+  background-image: radial-gradient(circle at 75% 8%, #dce8ff, transparent 500px);
+  color: #111827;
+}
+
+html.light ::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.12); }
+html.light ::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.22); }
+
+/* ── Panel surfaces ── */
+html.light .glass-panel {
+  background: #ffffff !important;
+  border-color: #dde2ec !important;
+  box-shadow: 0 1px 3px rgba(15,23,42,0.06), 0 8px 24px rgba(15,23,42,0.04) !important;
+}
+html.light .glass {
+  background: rgba(255,255,255,0.97) !important;
+  border-color: #dde2ec !important;
+  box-shadow: 0 1px 2px rgba(15,23,42,0.05) !important;
+  backdrop-filter: none !important;
+}
+html.light .devpulse-panel {
+  background: #ffffff !important;
+  border-color: #dde2ec !important;
+  box-shadow: 0 1px 4px rgba(15,23,42,0.07) !important;
+}
+
+/* ── Table internals ── */
+html.light .thead-row {
+  background-color: #f4f6fb !important;
+  border-color: #dde2ec !important;
+}
+html.light .tbody-row { border-color: #eef1f8 !important; }
+html.light .tbody-row:hover { background-color: #eef2ff !important; }
+html.light .divide-y > * + * { border-color: #eef1f8 !important; }
+
+/* ── Text colors — scoped to panels so badges/buttons stay correct ── */
+html.light .glass-panel .text-white,
+html.light .devpulse-panel .text-white,
+html.light .glass .text-white { color: #111827 !important; }
+
+html.light .glass-panel .text-slate-100,
+html.light .devpulse-panel .text-slate-100,
+html.light .glass .text-slate-100 { color: #1e293b !important; }
+
+html.light .glass-panel .text-slate-200,
+html.light .devpulse-panel .text-slate-200,
+html.light .glass .text-slate-200 { color: #1e293b !important; }
+
+html.light .glass-panel .text-slate-300,
+html.light .devpulse-panel .text-slate-300,
+html.light .glass .text-slate-300 { color: #374151 !important; }
+
+html.light .glass-panel .text-slate-400,
+html.light .devpulse-panel .text-slate-400,
+html.light .glass .text-slate-400 { color: #6b7280 !important; }
+
+html.light .glass-panel .text-slate-500,
+html.light .devpulse-panel .text-slate-500,
+html.light .glass .text-slate-500 { color: #9ca3af !important; }
+
+html.light .glass-panel .text-slate-600,
+html.light .devpulse-panel .text-slate-600,
+html.light .glass .text-slate-600 { color: #9ca3af !important; }
+
+/* hex text tokens */
+html.light .glass-panel .text-\[\#888\],
+html.light .devpulse-panel .text-\[\#888\],
+html.light .glass .text-\[\#888\] { color: #6b7280 !important; }
+
+html.light .glass-panel .text-\[\#666\],
+html.light .devpulse-panel .text-\[\#666\],
+html.light .glass .text-\[\#666\] { color: #9ca3af !important; }
+
+html.light .glass-panel .text-\[\#555\],
+html.light .devpulse-panel .text-\[\#555\],
+html.light .glass .text-\[\#555\] { color: #9ca3af !important; }
+
+/* ── Background tokens inside panels ── */
+html.light .glass-panel .bg-white\/3,
+html.light .devpulse-panel .bg-white\/3 { background-color: rgba(15,23,42,0.03) !important; }
+html.light .glass-panel .bg-white\/5,
+html.light .devpulse-panel .bg-white\/5 { background-color: rgba(15,23,42,0.04) !important; }
+html.light .glass-panel .bg-white\/8,
+html.light .devpulse-panel .bg-white\/8 { background-color: rgba(15,23,42,0.05) !important; }
+html.light .glass-panel .bg-black\/20,
+html.light .devpulse-panel .bg-black\/20 { background-color: rgba(15,23,42,0.04) !important; }
+
+/* ── Borders inside panels ── */
+html.light .glass-panel .border-white\/5,
+html.light .devpulse-panel .border-white\/5,
+html.light .glass .border-white\/5 { border-color: #dde2ec !important; }
+
+html.light .glass-panel .border-white\/10,
+html.light .devpulse-panel .border-white\/10,
+html.light .glass .border-white\/10 { border-color: #dde2ec !important; }
+
+html.light .glass-panel .border-\[\#222\],
+html.light .devpulse-panel .border-\[\#222\],
+html.light .glass-panel .border-\[\#222222\],
+html.light .devpulse-panel .border-\[\#222222\] { border-color: #dde2ec !important; }
+
+html.light .glass-panel .border-\[\#2a2a2a\],
+html.light .devpulse-panel .border-\[\#2a2a2a\] { border-color: #dde2ec !important; }
+
+html.light .glass-panel .border-slate-700,
+html.light .devpulse-panel .border-slate-700 { border-color: #dde2ec !important; }
+
+/* ── Dark panel tones ── */
+html.light .glass-panel .bg-slate-800,
+html.light .devpulse-panel .bg-slate-800,
+html.light .glass .bg-slate-800 { background-color: #f4f6fb !important; }
+
+html.light .glass-panel .bg-slate-900,
+html.light .devpulse-panel .bg-slate-900 { background-color: #eef1f8 !important; }
+
+html.light .glass-panel .bg-\[\#111111\],
+html.light .devpulse-panel .bg-\[\#111111\] { background-color: #f4f6fb !important; }
+
+html.light .glass-panel .bg-\[\#0a0a0a\],
+html.light .devpulse-panel .bg-\[\#0a0a0a\] { background-color: #f4f6fb !important; }
+
+html.light .glass-panel .bg-\[\#1a1a1a\],
+html.light .devpulse-panel .bg-\[\#1a1a1a\] { background-color: #f8f9fc !important; }
+
+html.light .glass-panel .bg-slate-900\/50,
+html.light .glass-panel .bg-slate-900\/60,
+html.light .glass-panel .bg-slate-800\/40,
+html.light .glass-panel .bg-slate-800\/50,
+html.light .glass-panel .bg-slate-800\/60 { background-color: #f4f6fb !important; }
+
+/* ── Hover states inside panels ── */
+html.light .glass-panel .hover\:bg-white\/5:hover,
+html.light .devpulse-panel .hover\:bg-white\/5:hover { background-color: #f4f6fb !important; }
+
+html.light .glass-panel .hover\:bg-\[\#1a1a1a\]:hover,
+html.light .devpulse-panel .hover\:bg-\[\#1a1a1a\]:hover { background-color: #eef2ff !important; }
+
+/* ── Input / select ── */
+html.light input,
+html.light select,
+html.light textarea { color: #111827 !important; }
+html.light input::placeholder,
+html.light textarea::placeholder { color: #9ca3af !important; }
+
+html.light .glass-panel input,
+html.light .glass-panel select,
+html.light .glass-panel textarea { background-color: #f4f6fb !important; border-color: #dde2ec !important; }
+
+/* ── Slider / drawer ── */
+html.light .animate-slide-in-right { background: #ffffff !important; }
+
+/* ── Sidebar active link in light mode ── */
+html.light .glass-panel a.text-slate-400 { color: #6b7280 !important; }
+html.light .glass-panel a:hover.text-slate-200 { color: #111827 !important; }
+
+/* ── Segment control (QuickStatus) in light mode ── */
+html.light .bg-white\/3 { background-color: rgba(15,23,42,0.03) !important; }
+html.light .border-white\/8 { border-color: #dde2ec !important; }
+html.light .divide-white\/8 > * + * { border-color: #dde2ec !important; }
+
+/* ── Leaflet ── */
 .leaflet-pane { z-index: 1; }
 .leaflet-top, .leaflet-bottom { z-index: 2; }
 
@@ -51,26 +234,16 @@
   .devpulse-panel {
     @apply bg-[#111111] border border-[#222222] rounded-xl shadow-lg;
   }
-}
-
-/* Custom Scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-
-body {
-  background-color: #0a0a0a;
-  background-image: radial-gradient(circle at top right, #111111, transparent 400px);
-  background-attachment: fixed;
+  .btn-amber {
+    @apply bg-amber-500 hover:bg-amber-400 text-slate-900 font-semibold px-4 py-2 rounded-xl text-sm transition-all shadow-[0_4px_14px_rgba(245,158,11,0.3)] hover:-translate-y-0.5 active:translate-y-0;
+  }
+  .input-base {
+    @apply w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-xl text-sm text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/40 focus:border-amber-500/40 transition-all;
+  }
+  .thead-row {
+    @apply border-b border-[#222] text-[10px] text-[#666] uppercase tracking-widest bg-[#0a0a0a];
+  }
+  .tbody-row {
+    @apply hover:bg-[#1a1a1a] transition-colors border-b border-[#1a1a1a];
+  }
 }

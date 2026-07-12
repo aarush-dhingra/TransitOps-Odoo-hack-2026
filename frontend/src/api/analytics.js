@@ -12,5 +12,8 @@ export const getFuelEfficiency = (params) =>
 export const getCostBreakdown = (params) =>
   api.get('/analytics/costs', { params });
 
+export const getVehicleCosts = (params) =>
+  api.get('/analytics/vehicle-costs', { params });
+
 export const getAlerts = () =>
   api.get('/analytics/alerts');
