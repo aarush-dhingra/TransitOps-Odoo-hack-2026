@@ -1,0 +1,272 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Enums ───────────────────────────────────────────────────────────────────
+
+enum Role {
+  FLEET_MANAGER
+  DISPATCHER
+  SAFETY_OFFICER
+  FINANCIAL_ANALYST
+  DRIVER
+}
+
+enum VehicleType {
+  VAN
+  TRUCK
+  BUS
+  CAR
+  BIKE
+}
+
+enum FuelType {
+  DIESEL
+  PETROL
+  CNG
+  ELECTRIC
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  ON_TRIP
+  MAINTENANCE
+  RETIRED
+}
+
+enum DriverStatus {
+  AVAILABLE
+  ON_TRIP
+  OFF_DUTY
+  ON_LEAVE
+  SUSPENDED
+}
+
+enum TripStatus {
+  PENDING
+  DISPATCHED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum MaintenanceType {
+  OIL_CHANGE
+  TYRE_ROTATION
+  FULL_SERVICE
+  BRAKE_SERVICE
+  ENGINE_CHECK
+  OTHER
+}
+
+enum MaintenanceStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum ExpenseCategory {
+  FUEL
+  TOLL
+  PARKING
+  DRIVER_ALLOWANCE
+  LOADING
+  OTHER
+}
+
+// ─── Models ──────────────────────────────────────────────────────────────────
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  role         Role
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  driverProfile   Driver?
+
+  tripsCreated    Trip[]           @relation("TripCreatedBy")
+  fuelLogs        FuelLog[]        @relation("FuelLogCreatedBy")
+  expenses        Expense[]        @relation("ExpenseCreatedBy")
+  maintenanceLogs MaintenanceLog[] @relation("MaintenanceCreatedBy")
+  auditLogs       AuditLog[]
+
+  @@map("users")
+}
+
+model Vehicle {
+  id                 String        @id @default(cuid())
+  registrationNumber String        @unique @map("registration_number")
+  make               String
+  model              String
+  year               Int
+  type               VehicleType
+  fuelType           FuelType      @map("fuel_type")
+  tankCapacity       Float         @map("tank_capacity")
+  currentOdometer    Float         @default(0) @map("current_odometer")
+  status             VehicleStatus @default(AVAILABLE)
+  insuranceExpiry    DateTime?     @map("insurance_expiry")
+  pucExpiry          DateTime?     @map("puc_expiry")
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  trips                Trip[]
+  fuelLogs             FuelLog[]
+  expenses             Expense[]
+  maintenanceLogs      MaintenanceLog[]
+  maintenanceSchedules MaintenanceSchedule[]
+
+  @@map("vehicles")
+}
+
+model Driver {
+  id              String       @id @default(cuid())
+  name            String
+  phone           String       @unique
+  email           String?
+  licenseNumber   String       @unique @map("license_number")
+  licenseCategory String       @map("license_category")
+  licenseExpiry   DateTime     @map("license_expiry")
+  safetyScore     Float        @default(100) @map("safety_score")
+  status          DriverStatus @default(AVAILABLE)
+
+  userId          String?      @unique @map("user_id")
+  user            User?        @relation(fields: [userId], references: [id])
+
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+
+  trips Trip[]
+
+  @@map("drivers")
+}
+
+model Trip {
+  id                 String     @id @default(cuid())
+  tripNumber         String     @unique @map("trip_number")
+  originAddress      String     @map("origin_address")
+  originLat          Float      @map("origin_lat")
+  originLng          Float      @map("origin_lng")
+  destinationAddress String     @map("destination_address")
+  destinationLat     Float      @map("destination_lat")
+  destinationLng     Float      @map("destination_lng")
+  distanceKm         Float?     @map("distance_km")
+  plannedDeparture   DateTime   @map("planned_departure")
+  plannedArrival     DateTime?  @map("planned_arrival")
+  actualDeparture    DateTime?  @map("actual_departure")
+  actualArrival      DateTime?  @map("actual_arrival")
+  startOdometer      Float?     @map("start_odometer")
+  endOdometer        Float?     @map("end_odometer")
+  status             TripStatus @default(PENDING)
+  notes              String?
+  vehicleId          String     @map("vehicle_id")
+  driverId           String     @map("driver_id")
+  createdById        String     @map("created_by_id")
+  createdAt          DateTime   @default(now()) @map("created_at")
+  updatedAt          DateTime   @updatedAt @map("updated_at")
+
+  vehicle   Vehicle   @relation(fields: [vehicleId], references: [id])
+  driver    Driver    @relation(fields: [driverId], references: [id])
+  createdBy User      @relation("TripCreatedBy", fields: [createdById], references: [id])
+  fuelLogs  FuelLog[]
+  expenses  Expense[]
+
+  @@map("trips")
+}
+
+model FuelLog {
+  id             String   @id @default(cuid())
+  vehicleId      String   @map("vehicle_id")
+  tripId         String?  @map("trip_id")
+  date           DateTime
+  litres         Float
+  pricePerLitre  Float    @map("price_per_litre")
+  totalCost      Float    @map("total_cost")
+  odometerAtFill Float    @map("odometer_at_fill")
+  location       String?
+  receiptUrl     String?  @map("receipt_url")
+  createdById    String   @map("created_by_id")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  trip      Trip?   @relation(fields: [tripId], references: [id])
+  createdBy User    @relation("FuelLogCreatedBy", fields: [createdById], references: [id])
+
+  @@map("fuel_logs")
+}
+
+model Expense {
+  id          String          @id @default(cuid())
+  vehicleId   String          @map("vehicle_id")
+  tripId      String?         @map("trip_id")
+  category    ExpenseCategory
+  amount      Float
+  date        DateTime
+  description String?
+  receiptUrl  String?         @map("receipt_url")
+  createdById String          @map("created_by_id")
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  trip      Trip?   @relation(fields: [tripId], references: [id])
+  createdBy User    @relation("ExpenseCreatedBy", fields: [createdById], references: [id])
+
+  @@map("expenses")
+}
+
+model MaintenanceLog {
+  id                String            @id @default(cuid())
+  vehicleId         String            @map("vehicle_id")
+  type              MaintenanceType
+  description       String?
+  date              DateTime
+  cost              Float?
+  odometerAtService Float?            @map("odometer_at_service")
+  vendorName        String?           @map("vendor_name")
+  vendorContact     String?           @map("vendor_contact")
+  status            MaintenanceStatus @default(SCHEDULED)
+  createdById       String            @map("created_by_id")
+  createdAt         DateTime          @default(now()) @map("created_at")
+  updatedAt         DateTime          @updatedAt @map("updated_at")
+
+  vehicle   Vehicle @relation(fields: [vehicleId], references: [id])
+  createdBy User    @relation("MaintenanceCreatedBy", fields: [createdById], references: [id])
+
+  @@map("maintenance_logs")
+}
+
+model MaintenanceSchedule {
+  id              String          @id @default(cuid())
+  vehicleId       String          @map("vehicle_id")
+  serviceType     MaintenanceType @map("service_type")
+  intervalKm      Float           @map("interval_km")
+  lastOdometer    Float           @map("last_odometer")
+  nextDueOdometer Float           @map("next_due_odometer")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+
+  @@map("maintenance_schedules")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String   @map("user_id")
+  action     String
+  entityType String   @map("entity_type")
+  entityId   String   @map("entity_id")
+  details    Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@map("audit_logs")
+}

@@ -1,0 +1,40 @@
+{
+  "name": "transitops-backend",
+  "version": "1.0.0",
+  "description": "TransitOps Smart Transport Operations Platform – Backend API",
+  "main": "src/index.js",
+  "scripts": {
+    "dev": "nodemon src/index.js",
+    "start": "node src/index.js",
+    "lint": "eslint src --ext .js",
+    "lint:fix": "eslint src --ext .js --fix",
+    "format": "prettier --write \"src/**/*.js\" \"prisma/**/*.js\"",
+    "db:migrate": "prisma migrate dev",
+    "db:migrate:deploy": "prisma migrate deploy",
+    "db:seed": "node prisma/seed.js",
+    "db:studio": "prisma studio",
+    "db:reset": "prisma migrate reset --force"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.22.0",
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.1",
+    "jsonwebtoken": "^9.0.2",
+    "morgan": "^1.10.0",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "eslint": "^8.57.1",
+    "nodemon": "^3.1.7",
+    "prettier": "^3.3.3",
+    "prisma": "^5.22.0"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
