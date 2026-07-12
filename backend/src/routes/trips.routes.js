@@ -11,6 +11,9 @@ const {
   updateTrip,
   dispatchTrip,
   startTrip,
+  getDispatchRecommendations,
+  getTripSummary,
+  getTripSummaryPdf,
   completeTrip,
   cancelTrip,
   createTripSchema,
@@ -22,9 +25,13 @@ const router = Router();
 const FM = 'FLEET_MANAGER';
 const DISP = 'DISPATCHER';
 const SO = 'SAFETY_OFFICER';
+const FA = 'FINANCIAL_ANALYST';
 
 router.get('/', verifyToken, requireRole(DISP, FM, SO), getTrips);
+router.get('/recommendations', verifyToken, requireRole(DISP, FM), getDispatchRecommendations);
 router.post('/', verifyToken, requireRole(DISP, FM), validate(createTripSchema), createTrip);
+router.get('/:id/summary/pdf', verifyToken, requireRole(DISP, FM, SO, FA), getTripSummaryPdf);
+router.get('/:id/summary', verifyToken, requireRole(DISP, FM, SO, FA), getTripSummary);
 router.get('/:id', verifyToken, requireRole(DISP, FM, SO), getTripById);
 router.put('/:id', verifyToken, requireRole(DISP, FM), updateTrip);
 router.patch(

@@ -9,6 +9,8 @@ const {
   updateVehicle,
   deleteVehicle,
   patchVehicleStatus,
+  getVehicleTimeline,
+  getVehicleDocumentVault,
   createVehicleSchema,
   updateVehicleSchema,
   patchVehicleStatusSchema,
@@ -24,6 +26,8 @@ const FA   = 'FINANCIAL_ANALYST';   // needs read-only for fuel-log vehicle pick
 
 router.get('/', verifyToken, requireRole(FM, DISP, FA), listVehicles);
 router.post('/', verifyToken, requireRole(FM), validate(createVehicleSchema), createVehicle);
+router.get('/:id/timeline', verifyToken, requireRole(FM, DISP), getVehicleTimeline);
+router.get('/:id/document-vault', verifyToken, requireRole(FM, DISP), getVehicleDocumentVault);
 router.get('/:id', verifyToken, requireRole(FM, DISP, FA), getVehicle);
 router.put('/:id', verifyToken, requireRole(FM), validate(updateVehicleSchema), updateVehicle);
 router.patch(

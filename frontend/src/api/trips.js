@@ -20,3 +20,19 @@ export const startTrip = (id) =>
 
 export const cancelTrip = (id) =>
   api.patch(`/trips/${id}/cancel`);
+
+export const getDispatchRecommendations = (params) =>
+  api.get('/trips/recommendations', { params });
+
+export const getTripSummary = (id) =>
+  api.get(`/trips/${id}/summary`);
+
+export const downloadTripSummaryPdf = async (id, tripNumber) => {
+  const response = await api.get(`/trips/${id}/summary/pdf`, { responseType: 'blob' });
+  const blob = new Blob([response.data], { type: 'application/pdf' });
+  const link = document.createElement('a');
+  link.href = window.URL.createObjectURL(blob);
+  link.download = `trip-${tripNumber}-summary.pdf`;
+  link.click();
+  window.URL.revokeObjectURL(link.href);
+};
