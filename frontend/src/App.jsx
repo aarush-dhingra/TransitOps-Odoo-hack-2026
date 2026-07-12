@@ -5,6 +5,7 @@ import DriverPortalShell from './components/layout/DriverPortalShell';
 import { ALL_ERP_ROLES } from './lib/permissions';
 
 import LoginPage from './pages/auth/LoginPage';
+import ForgotPasswordPage from './pages/auth/ForgotPasswordPage';
 import DashboardPage from './pages/dashboard/DashboardPage';
 import VehiclesPage from './pages/vehicles/VehiclesPage';
 import DriversPage from './pages/drivers/DriversPage';
@@ -21,6 +22,7 @@ export default function App() {
     <Routes>
       {/* Public */}
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
 
       {/* ERP - all office roles + admin */}
       <Route element={<ProtectedRoute allowedRoles={ALL_ERP_ROLES} />}>
