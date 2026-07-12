@@ -12,6 +12,7 @@ const expenseRoutes = require('./expenses.routes');
 const analyticsRoutes = require('./analytics.routes');
 const portalRoutes = require('./portal.routes');
 const adminRoutes = require('./admin.routes');
+const documentRoutes = require('./documents.routes');
 
 const router = Router();
 
@@ -25,5 +26,6 @@ router.use('/expenses', expenseRoutes);
 router.use('/analytics', analyticsRoutes);
 router.use('/portal', portalRoutes);
 router.use('/admin', adminRoutes);
+router.use('/documents', documentRoutes);
 
 module.exports = router;
