@@ -19,13 +19,13 @@ export const ALL_ERP_ROLES = [ROLES.ADMIN, ...ERP_ROLES];
 /** resource → { read: Role[], write: Role[] } */
 const ACCESS = {
   dashboard:  { read: ALL_ERP_ROLES, write: [] },
-  settings:   { read: ALL_ERP_ROLES, write: [ROLES.ADMIN, ROLES.FLEET_MANAGER] },
-  fleet:      { read: [ROLES.ADMIN, ROLES.FLEET_MANAGER, ROLES.DISPATCHER, ROLES.FINANCIAL_ANALYST], write: [ROLES.ADMIN, ROLES.FLEET_MANAGER] },
-  drivers:    { read: [ROLES.ADMIN, ROLES.FLEET_MANAGER, ROLES.SAFETY_OFFICER], write: [ROLES.ADMIN, ROLES.FLEET_MANAGER, ROLES.SAFETY_OFFICER] },
-  trips:      { read: [ROLES.ADMIN, ROLES.DISPATCHER, ROLES.SAFETY_OFFICER], write: [ROLES.ADMIN, ROLES.DISPATCHER] },
-  fuel:       { read: [ROLES.ADMIN, ROLES.FINANCIAL_ANALYST], write: [ROLES.ADMIN, ROLES.FINANCIAL_ANALYST] },
-  analytics:  { read: [ROLES.ADMIN, ROLES.FLEET_MANAGER, ROLES.FINANCIAL_ANALYST], write: [] },
-  maintenance: { read: [ROLES.ADMIN, ROLES.FLEET_MANAGER], write: [ROLES.ADMIN, ROLES.FLEET_MANAGER] },
+  settings:   { read: ALL_ERP_ROLES, write: ALL_ERP_ROLES },
+  fleet:      { read: [ROLES.FLEET_MANAGER, ROLES.DISPATCHER, ROLES.FINANCIAL_ANALYST], write: [ROLES.FLEET_MANAGER] },
+  drivers:    { read: [ROLES.FLEET_MANAGER, ROLES.SAFETY_OFFICER], write: [ROLES.FLEET_MANAGER, ROLES.SAFETY_OFFICER] },
+  trips:      { read: [ROLES.DISPATCHER, ROLES.SAFETY_OFFICER], write: [ROLES.DISPATCHER] },
+  fuel:       { read: [ROLES.FINANCIAL_ANALYST], write: [ROLES.FINANCIAL_ANALYST] },
+  analytics:  { read: [ROLES.FLEET_MANAGER, ROLES.FINANCIAL_ANALYST], write: [ROLES.FLEET_MANAGER, ROLES.FINANCIAL_ANALYST] },
+  maintenance: { read: [ROLES.FLEET_MANAGER], write: [ROLES.FLEET_MANAGER] },
 };
 
 export function canAccess(role, resource, action = 'read') {

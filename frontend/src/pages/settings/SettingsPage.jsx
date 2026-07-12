@@ -3,7 +3,7 @@ import PageHeader from '../../components/shared/PageHeader';
 import { toast } from 'sonner';
 
 const RBAC_TABLE = [
-  { role: 'Fleet Manager',    fleet: '✓',    drivers: '✓',    trips: '✓',    fuel: '✓',    analytics: '✓' },
+  { role: 'Fleet Manager',    fleet: '✓',    drivers: '✓',    trips: '—',    fuel: '—',    analytics: '✓' },
   { role: 'Dispatcher',       fleet: 'View', drivers: '—',    trips: '✓',    fuel: '—',    analytics: '—' },
   { role: 'Safety Officer',   fleet: '—',    drivers: '✓',    trips: 'View', fuel: '—',    analytics: '—' },
   { role: 'Financial Analyst',fleet: 'View', drivers: '—',    trips: '—',    fuel: '✓',    analytics: '✓' },
