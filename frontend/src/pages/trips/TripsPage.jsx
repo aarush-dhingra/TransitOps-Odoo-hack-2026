@@ -1,7 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Plus, X, AlertTriangle, ArrowRight, Clock, Truck, User, Sparkles, FileDown } from 'lucide-react';
+import { MapContainer, TileLayer, Polyline, CircleMarker, Popup } from 'react-leaflet';
 import {
-  getTrips, createTrip, updateTrip, dispatchTrip, startTrip, completeTrip, cancelTrip,
+  getTrips, getTrip, createTrip, updateTrip, dispatchTrip, startTrip, completeTrip, cancelTrip,
   getDispatchRecommendations, getTripSummary, downloadTripSummaryPdf,
 } from '../../api/trips';
 import { getVehicles } from '../../api/vehicles';
@@ -18,6 +19,7 @@ import { toast } from 'sonner';
 import { usePermissions } from '../../hooks/useAuth';
 import { useSearch } from '../../context/SearchContext';
 import { cn } from '../../lib/utils';
+import { getRoute, getNearbyPlaces } from '../../api/locations';
 
 const LIFECYCLE = ['DRAFT', 'DISPATCHED', 'ACTIVE', 'COMPLETED'];
 const LIFECYCLE_LABELS = { DRAFT: 'Draft', DISPATCHED: 'Assigned', ACTIVE: 'En Route', COMPLETED: 'Completed' };
@@ -101,6 +103,12 @@ export default function TripsPage() {
   const [insightLoading, setInsightLoading] = useState(false);
   const [recommendations, setRecommendations] = useState([]);
   const [summary, setSummary] = useState(null);
+  const [distanceManuallyEdited, setDistanceManuallyEdited] = useState(false);
+  const [routeCalculating, setRouteCalculating] = useState(false);
+  const [trackingTrip, setTrackingTrip] = useState(null);
+  const [trackingRoute, setTrackingRoute] = useState([]);
+  const [nearbyPlaces, setNearbyPlaces] = useState([]);
+  const [trackingLoading, setTrackingLoading] = useState(false);
 
   // Modals
   const [odometerTarget, setOdometerTarget] = useState(null);
@@ -137,6 +145,78 @@ export default function TripsPage() {
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
+  const calculateDistance = useCallback(async (force = false) => {
+    if (!form.originLat || !form.originLng || !form.destinationLat || !form.destinationLng) return;
+    if (distanceManuallyEdited && !force) return;
+    setRouteCalculating(true);
+    try {
+      const response = await getRoute({
+        originLat: form.originLat,
+        originLng: form.originLng,
+        destinationLat: form.destinationLat,
+        destinationLng: form.destinationLng,
+      });
+      setForm((current) => ({ ...current, distanceKm: response.data.data.distanceKm }));
+      if (force) setDistanceManuallyEdited(false);
+    } catch {
+      toast.error('Could not calculate road distance. You can enter it manually.');
+    } finally {
+      setRouteCalculating(false);
+    }
+  }, [
+    form.originLat,
+    form.originLng,
+    form.destinationLat,
+    form.destinationLng,
+    distanceManuallyEdited,
+  ]);
+
+  useEffect(() => {
+    calculateDistance();
+  }, [calculateDistance]);
+
+  const openLiveMap = async (trip) => {
+    setTrackingTrip(trip);
+    setTrackingLoading(true);
+    try {
+      const routeResponse = await getRoute({
+        originLat: trip.originLat,
+        originLng: trip.originLng,
+        destinationLat: trip.destinationLat,
+        destinationLng: trip.destinationLng,
+      });
+      const currentLat = trip.currentLat ?? trip.originLat;
+      const currentLng = trip.currentLng ?? trip.originLng;
+      const placesResponse = await getNearbyPlaces({ lat: currentLat, lng: currentLng });
+      setTrackingRoute(routeResponse.data.data.coordinates ?? []);
+      setNearbyPlaces(placesResponse.data.data ?? []);
+    } catch (err) {
+      toast.error(err.response?.data?.error?.message ?? 'Failed to load live route.');
+    } finally {
+      setTrackingLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!trackingTrip || trackingTrip.status !== 'ACTIVE') return undefined;
+    const timer = setInterval(async () => {
+      try {
+        const response = await getTrip(trackingTrip.id);
+        setTrackingTrip(response.data.data);
+      } catch {
+        // Keep the last known position visible during transient refresh failures.
+      }
+    }, 15000);
+    return () => clearInterval(timer);
+  }, [trackingTrip]);
+
+  useEffect(() => {
+    if (!trackingTrip?.currentLat || !trackingTrip?.currentLng) return;
+    getNearbyPlaces({ lat: trackingTrip.currentLat, lng: trackingTrip.currentLng })
+      .then((response) => setNearbyPlaces(response.data.data ?? []))
+      .catch(() => {});
+  }, [trackingTrip?.currentLat, trackingTrip?.currentLng]);
+
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!form.originLat || !form.destinationLat) {
@@ -172,6 +252,7 @@ export default function TripsPage() {
       toast.success(`Trip created as Draft.${label ? ` (${label})` : ''}`);
       setDrawerOpen(false);
       setForm(EMPTY_FORM);
+      setDistanceManuallyEdited(false);
       fetchAll();
     } catch (err) {
       toast.error(err.response?.data?.error?.message ?? 'Failed to create trip.');
@@ -479,12 +560,20 @@ export default function TripsPage() {
 
                         {/* ACTIVE: Complete trip (requires end odometer) */}
                         {t.status === 'ACTIVE' && (
-                          <button
-                            onClick={() => setOdometerTarget({ id: t.id, tripNumber: t.tripNumber, startOdometer: t.startOdometer })}
-                            className="px-3 py-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 rounded-lg text-xs font-semibold hover:bg-emerald-500/25 transition-colors"
-                          >
-                            Complete
-                          </button>
+                          <>
+                            <button
+                              onClick={() => openLiveMap(t)}
+                              className="px-3 py-1.5 bg-blue-500/15 text-blue-400 border border-blue-500/25 rounded-lg text-xs font-semibold hover:bg-blue-500/25 transition-colors"
+                            >
+                              Live Map
+                            </button>
+                            <button
+                              onClick={() => setOdometerTarget({ id: t.id, tripNumber: t.tripNumber, startOdometer: t.startOdometer })}
+                              className="px-3 py-1.5 bg-emerald-500/15 text-emerald-400 border border-emerald-500/25 rounded-lg text-xs font-semibold hover:bg-emerald-500/25 transition-colors"
+                            >
+                              Complete
+                            </button>
+                          </>
                         )}
 
                         {/* Cancel — available for DRAFT, DISPATCHED, ACTIVE */}
@@ -528,6 +617,70 @@ export default function TripsPage() {
         onConfirm={handleCancel}
         destructive
       />
+
+      {trackingTrip && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
+          <div className="absolute inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setTrackingTrip(null)} />
+          <div className="relative w-full max-w-5xl glass-panel rounded-2xl border border-white/10 overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
+              <div>
+                <h2 className="font-semibold text-white">Live trip · {trackingTrip.tripNumber}</h2>
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {trackingTrip.locationUpdatedAt
+                    ? `Driver location updated ${formatDateTime(trackingTrip.locationUpdatedAt)}`
+                    : 'Waiting for the driver device to share its first location'}
+                </p>
+              </div>
+              <button onClick={() => setTrackingTrip(null)} className="text-slate-400 hover:text-white" aria-label="Close live map">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            {trackingLoading ? (
+              <div className="h-[560px] flex items-center justify-center"><LoadingSpinner /></div>
+            ) : (
+              <>
+                <MapContainer
+                  key={trackingTrip.id}
+                  center={[trackingTrip.currentLat ?? trackingTrip.originLat, trackingTrip.currentLng ?? trackingTrip.originLng]}
+                  zoom={8}
+                  className="h-[500px] w-full"
+                >
+                  <TileLayer
+                    attribution='&copy; OpenStreetMap contributors'
+                    url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                  />
+                  {trackingRoute.length > 1 && <Polyline positions={trackingRoute} color="blue" weight={5} />}
+                  <CircleMarker center={[trackingTrip.originLat, trackingTrip.originLng]} radius={8} color="green">
+                    <Popup>Source: {trackingTrip.originAddress}</Popup>
+                  </CircleMarker>
+                  <CircleMarker center={[trackingTrip.destinationLat, trackingTrip.destinationLng]} radius={8} color="red">
+                    <Popup>Destination: {trackingTrip.destinationAddress}</Popup>
+                  </CircleMarker>
+                  {trackingTrip.currentLat && trackingTrip.currentLng && (
+                    <CircleMarker center={[trackingTrip.currentLat, trackingTrip.currentLng]} radius={10} color="orange">
+                      <Popup>Current vehicle position</Popup>
+                    </CircleMarker>
+                  )}
+                  {nearbyPlaces.map((place) => (
+                    <CircleMarker key={place.id} center={[place.latitude, place.longitude]} radius={5} color="purple">
+                      <Popup>
+                        <strong>{place.name}</strong><br />
+                        {place.categories.some((category) => category.includes('gas')) ? 'Fuel stop' : 'Rest / service stop'}<br />
+                        {place.address}
+                      </Popup>
+                    </CircleMarker>
+                  ))}
+                </MapContainer>
+                <div className="px-5 py-3 flex flex-wrap gap-4 text-xs text-slate-400 border-t border-white/10">
+                  <span>Route distance: {trackingTrip.distanceKm ?? '—'} km</span>
+                  <span>Useful stops nearby: {nearbyPlaces.length}</span>
+                  <span>Position refreshes every 15 seconds</span>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Create Trip Drawer */}
       {drawerOpen && canEditTrips && (
@@ -595,8 +748,22 @@ export default function TripsPage() {
               <div>
                 <label className="block text-xs text-slate-400 mb-1 uppercase tracking-wider">Distance (km)</label>
                 <input type="number" min="0" step="any" value={form.distanceKm}
-                  onChange={(e) => setForm((f) => ({ ...f, distanceKm: e.target.value }))}
-                  className={inputCls} placeholder="Optional" />
+                  onChange={(e) => {
+                    setDistanceManuallyEdited(true);
+                    setForm((f) => ({ ...f, distanceKm: e.target.value }));
+                  }}
+                  className={inputCls} placeholder={routeCalculating ? 'Calculating route…' : 'Calculated automatically'} />
+                <div className="flex items-center justify-between mt-1">
+                  <p className="text-[11px] text-slate-500">
+                    {distanceManuallyEdited ? 'Manual override' : 'Road distance from selected locations'}
+                  </p>
+                  {distanceManuallyEdited && (
+                    <button type="button" onClick={() => calculateDistance(true)}
+                      className="text-[11px] text-amber-400 hover:text-amber-300">
+                      Use route distance
+                    </button>
+                  )}
+                </div>
               </div>
 
               {/* Vehicle (optional) */}

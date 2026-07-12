@@ -204,6 +204,41 @@ async function completeTrip(req, res, next) {
   }
 }
 
+async function updateTripLocation(req, res, next) {
+  try {
+    const driverId = await getDriverId(req);
+    const latitude = Number(req.body.latitude);
+    const longitude = Number(req.body.longitude);
+    if (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 ||
+        !Number.isFinite(longitude) || longitude < -180 || longitude > 180) {
+      return error(res, 'VALIDATION_ERROR', 'Valid latitude and longitude are required.', 400);
+    }
+
+    const trip = await prisma.trip.findUnique({ where: { id: req.params.id } });
+    if (!trip) {
+      return error(res, 'NOT_FOUND', 'Trip not found.', 404);
+    }
+    if (!driverId || trip.driverId !== driverId) {
+      return error(res, 'FORBIDDEN', 'You can only update your assigned trip.', 403);
+    }
+    if (trip.status !== 'ACTIVE') {
+      return error(res, 'INVALID_TRANSITION', 'Location can only be updated for an active trip.', 400);
+    }
+
+    const updatedTrip = await prisma.trip.update({
+      where: { id: trip.id },
+      data: {
+        currentLat: latitude,
+        currentLng: longitude,
+        locationUpdatedAt: new Date(),
+      },
+    });
+    return success(res, updatedTrip);
+  } catch (err) {
+    return next(err);
+  }
+}
+
 async function createDriverFuelLog(req, res, next) {
   try {
     const driverId = await getDriverId(req);
@@ -311,6 +346,7 @@ module.exports = {
   getDriverTrips,
   startTrip,
   completeTrip,
+  updateTripLocation,
   createDriverFuelLog,
   createDriverExpense,
 };

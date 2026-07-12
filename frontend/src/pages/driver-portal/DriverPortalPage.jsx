@@ -1,12 +1,19 @@
 import { useEffect, useState, useCallback } from 'react';
-import { getMyTrips, startTrip, completeTrip, submitFuelLog, submitExpense } from '../../api/portal';
+import {
+  getMyTrips,
+  startTrip,
+  completeTrip,
+  submitFuelLog,
+  submitExpense,
+  updateTripLocation,
+} from '../../api/portal';
 import StatusBadge from '../../components/shared/StatusBadge';
 import LoadingSpinner from '../../components/shared/LoadingSpinner';
 import EmptyState from '../../components/shared/EmptyState';
 import OdometerModal from '../../components/shared/OdometerModal';
 import { formatDateTime, formatCurrency } from '../../lib/utils';
 import { toast } from 'sonner';
-import { ArrowRight, Truck, MapPin, Clock, Fuel, Receipt, Plus, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowRight, Truck, MapPin, Clock, Fuel, Receipt, X, ChevronDown, ChevronUp } from 'lucide-react';
 import { cn } from '../../lib/utils';
 
 const EXPENSE_CATEGORIES = ['TOLL', 'PARKING', 'DRIVER_ALLOWANCE', 'LOADING', 'OTHER'];
@@ -281,6 +288,26 @@ export default function DriverPortalPage() {
   }, []);
 
   useEffect(() => { fetchTrips(); }, [fetchTrips]);
+
+  useEffect(() => {
+    const activeTrip = trips.find((trip) => trip.status === 'ACTIVE');
+    if (!activeTrip || !navigator.geolocation) return undefined;
+
+    let lastSentAt = 0;
+    const watchId = navigator.geolocation.watchPosition(
+      ({ coords }) => {
+        if (Date.now() - lastSentAt < 15000) return;
+        lastSentAt = Date.now();
+        updateTripLocation(activeTrip.id, {
+          latitude: coords.latitude,
+          longitude: coords.longitude,
+        }).catch(() => {});
+      },
+      () => {},
+      { enableHighAccuracy: true, maximumAge: 10000, timeout: 15000 }
+    );
+    return () => navigator.geolocation.clearWatch(watchId);
+  }, [trips]);
 
   const handleStart = async (trip) => {
     try {

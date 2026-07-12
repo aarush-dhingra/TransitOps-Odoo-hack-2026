@@ -140,7 +140,9 @@ async function getNotifications(req, res, next) {
     const SEV = { error: 0, warning: 1, info: 2 };
     notifications.sort((a, b) => {
       const sd = SEV[a.severity] - SEV[b.severity];
-      if (sd !== 0) return sd;
+      if (sd !== 0) {
+        return sd;
+      }
       return new Date(b.createdAt) - new Date(a.createdAt);
     });
 

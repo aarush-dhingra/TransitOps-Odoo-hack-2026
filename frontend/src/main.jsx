@@ -7,6 +7,7 @@ import { ThemeProvider } from './context/ThemeContext';
 import { SearchProvider } from './context/SearchContext';
 import { NotificationsProvider } from './context/NotificationsContext';
 import App from './App';
+import 'leaflet/dist/leaflet.css';
 import './index.css';
 
 createRoot(document.getElementById('root')).render(

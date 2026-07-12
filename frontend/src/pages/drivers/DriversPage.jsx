@@ -253,7 +253,6 @@ export default function DriversPage() {
               </thead>
               <tbody className="divide-y divide-[#1a1a1a]">
                 {displayed.map((d) => {
-                  const days = daysUntilExpiry(d.licenseExpiry);
                   return (
                     <tr key={d.id} className="tbody-row">
                       <td className="px-5 py-3">

@@ -189,6 +189,9 @@ model Trip {
   actualArrival      DateTime?  @map("actual_arrival")
   startOdometer      Float?     @map("start_odometer")
   endOdometer        Float?     @map("end_odometer")
+  currentLat         Float?     @map("current_lat")
+  currentLng         Float?     @map("current_lng")
+  locationUpdatedAt  DateTime?  @map("location_updated_at")
   status             TripStatus @default(DRAFT)
   notes              String?
 

@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  Cell, CartesianGrid, Legend,
+  CartesianGrid, Legend,
 } from 'recharts';
 import { getDashboardStats, getFuelEfficiency, getCostBreakdown, getVehicleCosts } from '../../api/analytics';
 import StatCard from '../../components/shared/StatCard';

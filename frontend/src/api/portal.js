@@ -11,6 +11,9 @@ export const startTrip = (tripId) =>
 export const completeTrip = (tripId, data) =>
   api.patch(`/portal/trips/${tripId}/complete`, data);
 
+export const updateTripLocation = (tripId, data) =>
+  api.patch(`/portal/trips/${tripId}/location`, data);
+
 export const submitFuelLog = (data) =>
   api.post('/portal/fuel-logs', data);
 
