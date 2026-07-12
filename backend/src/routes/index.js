@@ -14,10 +14,10 @@ const portalRoutes = require('./portal.routes');
 
 const router = Router();
 
-// ─── Auth ──────────────────────────────────────────────────────────────────
+
 router.use('/auth', authRoutes);
 
-// ─── Fleet domain (Person A) ──────────────────────────────────────────────
+
 router.use('/vehicles', vehicleRoutes);
 router.use('/drivers', driverRoutes);
 router.use('/maintenance', maintenanceRoutes);

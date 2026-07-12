@@ -35,7 +35,8 @@ enum FuelType {
 enum VehicleStatus {
   AVAILABLE
   ON_TRIP
-  MAINTENANCE
+  IN_SHOP      // vehicle is undergoing maintenance
+  MAINTENANCE  // legacy alias – kept for backward compatibility
   RETIRED
 }
 
@@ -48,7 +49,8 @@ enum DriverStatus {
 }
 
 enum TripStatus {
-  PENDING
+  DRAFT        // created, vehicle/driver not yet assigned or dispatched
+  PENDING      // legacy alias – kept for backward compatibility
   DISPATCHED
   ACTIVE
   COMPLETED
@@ -102,20 +104,23 @@ model User {
 }
 
 model Vehicle {
-  id                 String        @id @default(cuid())
-  registrationNumber String        @unique @map("registration_number")
-  make               String
-  model              String
-  year               Int
-  type               VehicleType
-  fuelType           FuelType      @map("fuel_type")
-  tankCapacity       Float         @map("tank_capacity")
-  currentOdometer    Float         @default(0) @map("current_odometer")
-  status             VehicleStatus @default(AVAILABLE)
-  insuranceExpiry    DateTime?     @map("insurance_expiry")
-  pucExpiry          DateTime?     @map("puc_expiry")
-  createdAt          DateTime      @default(now()) @map("created_at")
-  updatedAt          DateTime      @updatedAt @map("updated_at")
+  id                  String        @id @default(cuid())
+  registrationNumber  String        @unique @map("registration_number")
+  make                String
+  model               String
+  year                Int
+  type                VehicleType
+  fuelType            FuelType      @map("fuel_type")
+  tankCapacity        Float         @map("tank_capacity")
+  currentOdometer     Float         @default(0) @map("current_odometer")
+  status              VehicleStatus @default(AVAILABLE)
+  maximumLoadCapacity Float?        @map("maximum_load_capacity")  // kg
+  acquisitionCost     Float?        @map("acquisition_cost")       // currency units
+  region              String?
+  insuranceExpiry     DateTime?     @map("insurance_expiry")
+  pucExpiry           DateTime?     @map("puc_expiry")
+  createdAt           DateTime      @default(now()) @map("created_at")
+  updatedAt           DateTime      @updatedAt @map("updated_at")
 
   trips                Trip[]
   fuelLogs             FuelLog[]
@@ -158,22 +163,26 @@ model Trip {
   destinationLat     Float      @map("destination_lat")
   destinationLng     Float      @map("destination_lng")
   distanceKm         Float?     @map("distance_km")
+  cargoWeight        Float?     @map("cargo_weight")              // kg – validated against vehicle.maximumLoadCapacity
+  revenue            Float?                                       // for ROI: (revenue - costs) / acquisitionCost
   plannedDeparture   DateTime   @map("planned_departure")
   plannedArrival     DateTime?  @map("planned_arrival")
   actualDeparture    DateTime?  @map("actual_departure")
   actualArrival      DateTime?  @map("actual_arrival")
   startOdometer      Float?     @map("start_odometer")
   endOdometer        Float?     @map("end_odometer")
-  status             TripStatus @default(PENDING)
+  status             TripStatus @default(DRAFT)
   notes              String?
-  vehicleId          String     @map("vehicle_id")
-  driverId           String     @map("driver_id")
+
+  // Nullable until dispatch – a DRAFT trip may not have vehicle/driver assigned yet
+  vehicleId          String?    @map("vehicle_id")
+  driverId           String?    @map("driver_id")
   createdById        String     @map("created_by_id")
   createdAt          DateTime   @default(now()) @map("created_at")
   updatedAt          DateTime   @updatedAt @map("updated_at")
 
-  vehicle   Vehicle   @relation(fields: [vehicleId], references: [id])
-  driver    Driver    @relation(fields: [driverId], references: [id])
+  vehicle   Vehicle?  @relation(fields: [vehicleId], references: [id])
+  driver    Driver?   @relation(fields: [driverId], references: [id])
   createdBy User      @relation("TripCreatedBy", fields: [createdById], references: [id])
   fuelLogs  FuelLog[]
   expenses  Expense[]
@@ -255,6 +264,16 @@ model MaintenanceSchedule {
   vehicle Vehicle @relation(fields: [vehicleId], references: [id])
 
   @@map("maintenance_schedules")
+}
+
+model Settings {
+  id           String   @id @default(cuid())
+  depotName    String   @default("TransitOps HQ") @map("depot_name")
+  currency     String   @default("INR")
+  distanceUnit String   @default("km") @map("distance_unit")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("settings")
 }
 
 model AuditLog {
