@@ -131,6 +131,9 @@ async function runTests() {
   console.log(`Using Vehicle: ${truck.registrationNumber} (ID: ${truck.id}, Status: ${truck.status})`);
   console.log(`Using Driver: ${driverRecord.name} (ID: ${driverRecord.id}, Status: ${driverRecord.status})`);
 
+  await prisma.vehicle.update({ where: { id: truck.id }, data: { status: 'AVAILABLE', currentOdometer: 50000 } });
+  await prisma.driver.update({ where: { id: driverRecord.id }, data: { status: 'AVAILABLE' } });
+
   console.log('\n--- 2. Trips CRUD ---');
   
   const tripBody = {
@@ -317,6 +320,71 @@ async function runTests() {
     throw new Error(`Cancel failed to restore vehicle/driver status back to AVAILABLE. Vehicle: ${vehicleFinal.status}, Driver: ${driverFinal.status}`);
   }
   console.log('Verified vehicle and driver reset back to AVAILABLE after cancellation');
+
+  const vehicleRegionRes = await req('/vehicles?region=Mumbai', 'GET', null, fleetManagerToken);
+  if (vehicleRegionRes.status !== 200 || !vehicleRegionRes.data.data.every((v) => v.region.toLowerCase().includes('mumbai'))) {
+    throw new Error('Failed region filter on vehicle list');
+  }
+
+  const offDutyDriver = await prisma.driver.create({
+    data: {
+      name: 'Off Duty Driver',
+      phone: '9999999999',
+      licenseNumber: 'TESTOFFDUTY',
+      licenseCategory: 'HMV',
+      licenseExpiry: new Date('2030-01-01'),
+      status: 'OFF_DUTY',
+    },
+  });
+
+  const tripBodyOffDuty = {
+    originAddress: 'Source Location',
+    originLat: 18.5204,
+    originLng: 73.8567,
+    destinationAddress: 'Destination Location',
+    destinationLat: 19.0760,
+    destinationLng: 72.8777,
+    distanceKm: 150,
+    plannedDeparture: new Date(Date.now() + 86400000).toISOString(),
+    vehicleId: truck.id,
+    driverId: offDutyDriver.id,
+  };
+
+  const createTripOffDutyRes = await req('/trips', 'POST', tripBodyOffDuty, dispatcherToken);
+  await prisma.driver.delete({ where: { id: offDutyDriver.id } });
+  if (createTripOffDutyRes.status !== 400 || createTripOffDutyRes.data.error.code !== 'DRIVER_NOT_AVAILABLE') {
+    throw new Error('Dispatch did not block OFF_DUTY driver');
+  }
+
+  const tripToStart = await prisma.trip.create({
+    data: {
+      tripNumber: 'TRIP-START-TEST',
+      originAddress: 'A',
+      originLat: 0,
+      originLng: 0,
+      destinationAddress: 'B',
+      destinationLat: 0,
+      destinationLng: 0,
+      status: 'DISPATCHED',
+      plannedDeparture: new Date(),
+      createdById: adminLogin.data.data.user.id,
+    },
+  });
+  const startTripRes = await req(`/trips/${tripToStart.id}/start`, 'PATCH', null, dispatcherToken);
+  await prisma.trip.delete({ where: { id: tripToStart.id } });
+  if (startTripRes.status !== 200 || startTripRes.data.data.status !== 'ACTIVE') {
+    throw new Error('PATCH /trips/:id/start failed');
+  }
+
+  const vehicleCostsRes = await req('/analytics/vehicle-costs', 'GET', null, fleetManagerToken);
+  if (vehicleCostsRes.status !== 200 || !Array.isArray(vehicleCostsRes.data.data)) {
+    throw new Error('GET /analytics/vehicle-costs failed');
+  }
+
+  const filteredFuelRes = await req(`/fuel-logs?vehicleId=${truck.id}`, 'GET', null, fleetManagerToken);
+  if (filteredFuelRes.status !== 200 || !filteredFuelRes.data.data.every((f) => f.vehicleId === truck.id)) {
+    throw new Error('fuel-logs vehicleId filtering failed');
+  }
 }
 
 const server = app.listen(3001, async () => {

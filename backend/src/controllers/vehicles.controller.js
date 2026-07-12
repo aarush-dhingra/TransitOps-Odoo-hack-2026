@@ -79,6 +79,9 @@ async function listVehicles(req, res, next) {
     if (req.query.type) {
       where.type = req.query.type;
     }
+    if (req.query.region) {
+      where.region = { contains: req.query.region, mode: 'insensitive' };
+    }
     if (req.query.search) {
       where.OR = [
         { registrationNumber: { contains: req.query.search, mode: 'insensitive' } },
